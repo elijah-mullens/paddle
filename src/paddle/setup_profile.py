@@ -140,7 +140,10 @@ def integrate_dry_adiabat(
 
 
 def setup_profile(
-    block: snapy.MeshBlock, param: dict[str, float] = {}, method: str = "moist-adiabat"
+    block: snapy.MeshBlock,
+    param: dict[str, float] = {},
+    method: str = "moist-adiabat",
+    verbose: bool = False,
 ) -> torch.Tensor:
     """
     Set up an adiabatic initial condition for the mesh block.
@@ -227,7 +230,7 @@ def setup_profile(
     dz = coord.buffer("dx1f")[ifirst]
 
     # half a grid to cell center
-    thermo_x.extrapolate_ad(temp, pres, xfrac, grav, dz / 2.0)
+    thermo_x.extrapolate_ad(temp, pres, xfrac, grav, dz / 2.0, verbose=verbose)
 
     # adiabatic extrapolation
     if method == "isothermal":
@@ -257,7 +260,7 @@ def setup_profile(
         elif method.split("-")[0] == "neutral":
             temp, pres, xfrac = integrate_neutral(thermo_x, temp, pres, xfrac, grav, dz)
         else:
-            thermo_x.extrapolate_ad(temp, pres, xfrac, grav, dz)
+            thermo_x.extrapolate_ad(temp, pres, xfrac, grav, dz, verbose=verbose)
 
         if torch.any(temp < Tmin):
             i_isothermal = i + 1
