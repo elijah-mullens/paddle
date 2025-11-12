@@ -9,11 +9,6 @@ Python Atmospheric Dynamics: Discovering and Learning about Exoplanets. An open-
 python -m venv pyenv
 ```
 
-## Install paddle package
-```bash
-pip install paddle
-```
-
 # Create a docker container
 ```bash
 make up
@@ -32,5 +27,21 @@ make start
 # Build a new docker image (rarely used)
 ```bash
 make build
+```
+
+## For Development
+### Install paddle package
+```bash
+pip install paddle
+```
+
+### Install pre-commit hook
+```bash
+pip install pre-commit
+```
+
+### Install pre-commit hook
+```bash
+pre-commit install
 ```
 
