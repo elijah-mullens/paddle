@@ -22,7 +22,6 @@ services:
       - ${HOME}/projects:/projects
       # This is where you put your large simulation data
       - ${HOME}/data/:/data
-      #- ${HOME}/.gitconfig:/host/.gitconfig:ro
     working_dir: /projects
     tty: true
     stdin_open: true
