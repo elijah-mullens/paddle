@@ -1,0 +1,3 @@
+numpy==2.0.1
+pyharp==1.7.2
+torch==2.7.1
