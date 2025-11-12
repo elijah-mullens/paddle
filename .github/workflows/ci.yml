@@ -57,4 +57,4 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install numpy pytest 'pyharp>=1.7.1' 'torch==2.7.1'
+          pip install numpy scipy pytest paddle

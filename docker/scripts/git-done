@@ -1,0 +1,96 @@
+#!/bin/sh
+# sync-main-and-delete-current.sh
+# Usage: sync-main-and-delete-current.sh [-f] [-r] [-s]
+#   -f  force delete even if branch not merged (uses -D)
+#   -r  also delete remote branch on origin
+#   -s  stash uncommitted changes before switching branches
+
+set -eu
+
+FORCE=0
+DEL_REMOTE=0
+DO_STASH=0
+
+while getopts "frs" opt; do
+  case "$opt" in
+    f) FORCE=1 ;;
+    r) DEL_REMOTE=1 ;;
+    s) DO_STASH=1 ;;
+    *) echo "Usage: $0 [-f] [-r] [-s]"; exit 2 ;;
+  esac
+done
+
+# Ensure we're in a git repo
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "Not inside a git repository." >&2
+  exit 1
+fi
+
+# Determine current branch (avoid empty on detached HEAD)
+CURRENT_BRANCH="$(git symbolic-ref --short -q HEAD || true)"
+if [ -z "${CURRENT_BRANCH}" ] || [ "${CURRENT_BRANCH}" = "HEAD" ]; then
+  echo "Detached HEAD; please checkout a branch first." >&2
+  exit 1
+fi
+
+if [ "${CURRENT_BRANCH}" = "main" ]; then
+  echo "Already on 'main'; nothing to delete." >&2
+  exit 1
+fi
+
+# Optionally stash changes to avoid switch failures
+if [ "${DO_STASH}" -eq 1 ]; then
+  # Only stash if there are changes
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "Stashing local changes..."
+    git stash push -u -m "auto-stash by sync-main-and-delete-current"
+  fi
+fi
+
+echo "Fetching from origin..."
+git fetch origin
+
+# Ensure local main exists; create it tracking origin/main if needed
+if ! git show-ref --verify --quiet refs/heads/main; then
+  echo "Local 'main' missing; creating tracking branch..."
+  git branch --track main origin/main >/dev/null 2>&1 || true
+fi
+
+echo "Switching to main..."
+# Use checkout for POSIX sh compatibility
+git checkout main
+
+echo "Fast-forwarding main to origin/main..."
+# Strictly fast-forward to avoid accidental merge commits
+git merge --ff-only origin/main
+
+# Decide delete mode
+DELETE_FLAG="-d"
+if [ "${FORCE}" -eq 1 ]; then
+  DELETE_FLAG="-D"
+fi
+
+# Verify merged status when not forcing
+if [ "${FORCE}" -ne 1 ]; then
+  if git merge-base --is-ancestor "${CURRENT_BRANCH}" main; then
+    :
+  else
+    echo "Branch '${CURRENT_BRANCH}' is not merged into 'main'. Use -f to force delete." >&2
+    exit 1
+  fi
+fi
+
+echo "Deleting local branch '${CURRENT_BRANCH}' (${DELETE_FLAG})..."
+git branch "${DELETE_FLAG}" "${CURRENT_BRANCH}"
+
+if [ "${DEL_REMOTE}" -eq 1 ]; then
+  # Delete remote branch only if it exists
+  if git ls-remote --exit-code --heads origin "refs/heads/${CURRENT_BRANCH}" >/dev/null 2>&1; then
+    echo "Deleting remote branch 'origin/${CURRENT_BRANCH}'..."
+    git push origin --delete "${CURRENT_BRANCH}"
+  else
+    echo "Remote branch 'origin/${CURRENT_BRANCH}' not found; skipping."
+  fi
+fi
+
+echo "Done."

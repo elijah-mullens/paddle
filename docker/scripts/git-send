@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MSG="${1:-wip}"
+
+# Ensure we're inside a git repo
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "Not inside a git repository." >&2
+  exit 1
+fi
+
+# Resolve repo root and branch
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# Try the normal way; fall back if detached HEAD
+BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")"
+if [[ "$BRANCH" == "HEAD" || -z "$BRANCH" ]]; then
+  # Fallback: guess from upstream or default to 'main'
+  BRANCH="$(git symbolic-ref --short -q HEAD 2>/dev/null || echo main)"
+fi
+
+# Stage changes
+git add -A
+
+# Commit only if there’s something staged
+if ! git diff --cached --quiet; then
+  git commit -m "$MSG"
+else
+  echo "No staged changes; nothing to commit."
+fi
+
+# Ensure we have an upstream
+if ! git rev-parse --abbrev-ref --symbolic-full-name "@{u}" >/dev/null 2>&1; then
+  # If origin doesn't exist, error clearly
+  if ! git remote get-url origin >/dev/null 2>&1; then
+    echo "Remote 'origin' not configured. Set it first: git remote add origin <url>" >&2
+    exit 1
+  fi
+  git push -u origin "$BRANCH"
+else
+  # Rebase pull to avoid merge commits; allow autostash for local changes
+  git pull --rebase --autostash || true
+  git push
+fi

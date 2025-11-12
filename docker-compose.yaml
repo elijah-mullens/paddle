@@ -1,0 +1,29 @@
+services:
+  dev:
+    image: paddle
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        CUDA_VER: "12.9.1"
+        UBUNTU_VER: "22.04"
+    environment:
+      - USERNAME=${USER}
+      - USER_UID=${USER_UID}
+      - USER_GID=${USER_GID}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            # If your system does not have gpu, remove it from the []
+            - capabilities: [gpu]
+    volumes:
+      # This is your main working directory
+      - ${HOME}/projects:/projects
+      # This is where you put your large simulation data
+      - ${HOME}/data/:/data
+    working_dir: /projects
+    tty: true
+    stdin_open: true
+    ports:
+      - "8888:8888"

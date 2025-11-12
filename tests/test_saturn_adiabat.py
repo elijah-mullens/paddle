@@ -9,11 +9,12 @@ from snapy import (
     MeshBlock,
 )
 from kintera import ThermoX
+from pathlib import Path
 
 
 def setup_saturn_profile():
     # path = resources.files("paddle") / "data" / "saturn1d.yaml"
-    path = "data" / "saturn1d.yaml"
+    path = Path("data") / "saturn1d.yaml"
     print(f"Reading input file: {path}")
 
     op_block = MeshBlockOptions.from_yaml(str(path))
@@ -41,7 +42,7 @@ def setup_saturn_profile():
         method=method,
         max_iter=50,
         ftol=1.0e-2,
-        verbose=True,
+        verbose=False,
     )
 
     w = setup_profile(block, param, method=method)
