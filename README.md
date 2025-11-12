@@ -30,6 +30,11 @@ make build
 ```
 
 ## For Development
+### Cache your github credential
+```bash
+git config credential.helper 'cache --timeout=86400'
+```
+
 ### Install paddle package
 ```bash
 pip install paddle
