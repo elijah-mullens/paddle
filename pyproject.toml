@@ -32,8 +32,8 @@ classifiers = [
 
 dependencies = [
   "torch>=2.7.0,<=2.7.1",
-  "kintera>=1.0.1",
-  "snapy>=0.7.0",
+  "kintera>=1.1.5",
+  "snapy>=0.8.2",
 ]
 
 [project.optional-dependencies]

@@ -1,6 +1,6 @@
 services:
   dev:
-    image: ${USER}/kintera:dev
+    image: paddle
     build:
       context: .
       dockerfile: docker/Dockerfile
@@ -15,12 +15,15 @@ services:
       resources:
         reservations:
           devices:
-            - capabilities: [gpu]   # requires Compose v2 + nvidia toolkit
+            # If your system does not have gpu, remove it from the []
+            - capabilities: [gpu]
     volumes:
-      - ./:/workspace
+      # This is your main working directory
+      - ${HOME}/projects:/projects
+      # This is where you put your large simulation data
       - ${HOME}/data/:/data
-      - ${HOME}/.gitconfig:/host/.gitconfig:ro
-    working_dir: /workspace
+      #- ${HOME}/.gitconfig:/host/.gitconfig:ro
+    working_dir: /projects
     tty: true
     stdin_open: true
     ports:
