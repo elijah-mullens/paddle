@@ -1,0 +1,27 @@
+services:
+  dev:
+    image: ${USER}/kintera:dev
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        CUDA_VER: "12.9.1"
+        UBUNTU_VER: "22.04"
+    environment:
+      - USERNAME=${USER}
+      - USER_UID=${USER_UID}
+      - USER_GID=${USER_GID}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]   # requires Compose v2 + nvidia toolkit
+    volumes:
+      - ./:/workspace
+      - ${HOME}/data/:/data
+      - ${HOME}/.gitconfig:/host/.gitconfig:ro
+    working_dir: /workspace
+    tty: true
+    stdin_open: true
+    ports:
+      - "8888:8888"
