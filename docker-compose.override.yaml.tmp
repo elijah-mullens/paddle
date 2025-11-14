@@ -1,5 +1,9 @@
 services:
   dev:
+    build:
+      dockerfile: docker/Dockerfile.cuda
+      args:
+        CUDA_VER: "12.9.1"
     deploy:
       resources:
         reservations:
