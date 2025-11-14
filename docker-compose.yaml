@@ -11,11 +11,6 @@ services:
       - USERNAME=${USER}
       - USER_UID=${USER_UID}
       - USER_GID=${USER_GID}
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: []
     # This is volatile 
     # Make sure that you use override.yaml for permanent changes
     working_dir: /work
