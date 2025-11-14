@@ -11,7 +11,7 @@ services:
       - USERNAME=${USER}
       - USER_UID=${USER_UID}
       - USER_GID=${USER_GID}
-    # This is volatile 
+    # This is volatile
     # Make sure that you use override.yaml for permanent changes
     working_dir: /work
     tty: true
