@@ -5,7 +5,7 @@ ARG UBUNTU_VER=22.04
 ############################
 # Base CUDA toolchain
 ############################
-FROM ubuntu:${UBUNTU_VER} AS base
+FROM nvidia/cuda:${CUDA_VER}-devel-ubuntu${UBUNTU_VER} AS base
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC

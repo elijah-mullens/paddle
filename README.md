@@ -2,6 +2,13 @@
 Python Atmospheric Dynamics: Discovering and Learning about Exoplanets. An open-source, user-friendly python version of canoe.
 
 ## Install docker and docker-compose plugin
+1. install docker with compose
+```bash
+curl -fsSL https://get.docker.com | sudo sh
+```
+
+1. start docker
+sudo systemctl start docker
 
 ## Test package
 1. Create a python virtual environment
@@ -65,3 +72,7 @@ pip install pre-commit
 ```bash
 pre-commit install
 ```
+
+## Troubleshooting
+1. If you do not have docker compose
+Remove your current docker installation, it could be docker or docker.io

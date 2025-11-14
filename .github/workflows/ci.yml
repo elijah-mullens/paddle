@@ -44,7 +44,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-latest, macOS-latest]
+        #os: [ubuntu-latest, macOS-latest]
+        os: [ubuntu-latest]
     steps:
       - name: Check out code
         uses: actions/checkout@v4

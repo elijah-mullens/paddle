@@ -11,18 +11,9 @@ services:
       - USERNAME=${USER}
       - USER_UID=${USER_UID}
       - USER_GID=${USER_GID}
-    deploy:
-      resources:
-        reservations:
-          devices:
-            # If your system does not have gpu, remove it from the []
-            - capabilities: [gpu]
-    volumes:
-      # This is your main working directory
-      - ${HOME}/projects:/projects
-      # This is where you put your large simulation data
-      - ${HOME}/data/:/data
-    working_dir: /projects
+    # This is volatile
+    # Make sure that you use override.yaml for permanent changes
+    working_dir: /work
     tty: true
     stdin_open: true
     ports:
