@@ -1,0 +1,13 @@
+services:
+  dev:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            # Activate this if your system supports GPU
+            - capabilities: [gpu]
+    volumes:
+      # This is your main working directory
+      - ${HOME}/work:/work
+      # This is where you put your large simulation data
+      - ${HOME}/data/:/data
