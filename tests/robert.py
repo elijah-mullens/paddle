@@ -1,13 +1,11 @@
 import torch
 import math
 import time
-from snapy import MeshBlockOptions, MeshBlock
-from snapy.Index import kIDN, kIPR
-
-torch.set_default_dtype(torch.float64)
+from snapy import MeshBlockOptions, MeshBlock, check_signal
+from snapy import kIDN, kIPR
 
 
-def call_user_output(bvars, p0, Rd, cp):
+def call_user_output(bvars):
     hydro_w = bvars["hydro_w"]
     out = {}
     temp = hydro_w[kIPR] / (Rd * hydro_w[kIDN])
@@ -77,7 +75,7 @@ block_vars = {}
 block_vars["hydro_w"] = w
 block_vars = block.initialize(block_vars)
 
-block.set_user_output_func(lambda bvars: call_user_output(bvars, p0, Rd, cp))
+block.set_user_output_func(call_user_output)
 
 # integration
 start_time = time.time()
@@ -86,12 +84,15 @@ block.make_outputs(block_vars, current_time)
 
 while not block.intg.stop(block.inc_cycle(), current_time):
     dt = block.max_time_step(block_vars)
-    block.print_cycle_info(current_time, dt)
+    block.print_cycle_info(block_vars, current_time, dt)
 
     for stage in range(len(block.intg.stages)):
-        block.forward(dt, stage, block_vars)
+        block.forward(block_vars, dt, stage)
 
     current_time += dt
     block.make_outputs(block_vars, current_time)
+    if check_signal():
+        break
 
+block.finalize(block_vars, current_time)
 print("elapsed time = ", time.time() - start_time)

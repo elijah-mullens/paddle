@@ -1,10 +1,12 @@
 import torch
-from snapy import index, MeshBlockOptions, MeshBlock
+from snapy import MeshBlockOptions, MeshBlock, check_signal
+from snapy import kIDN, kIPR, kIV1, kIV2, kIV3
 
-torch.set_default_dtype(torch.float64)
-
-# device
-device = torch.device("cuda:0")
+# use cuda if available
+if torch.cuda.is_available():
+    device = torch.device("cuda:0")
+else:
+    device = torch.device("cpu")
 
 # set hydrodynamic model
 op = MeshBlockOptions.from_yaml("shock.yaml")
@@ -29,9 +31,9 @@ nvar = 5
 
 w = torch.zeros((nvar, nc3, nc2, nc1), device=device)
 
-w[index.idn] = torch.where(x1v < 0.0, 1.0, 0.125)
-w[index.ipr] = torch.where(x1v < 0.0, 1.0, 0.1)
-w[index.ivx] = w[index.ivy] = w[index.ivz] = 0.0
+w[kIDN] = torch.where(x1v < 0.0, 1.0, 0.125)
+w[kIPR] = torch.where(x1v < 0.0, 1.0, 0.1)
+w[kIV1] = w[kIV2] = w[kIV3] = 0.0
 
 # internal boundary
 r1 = torch.sqrt(x1v * x1v + x2v * x2v + x3v * x3v)
@@ -48,10 +50,14 @@ block.make_outputs(block_vars, current_time)
 
 while not block.intg.stop(block.inc_cycle(), current_time):
     dt = block.max_time_step(block_vars)
-    block.print_cycle_info(current_time, dt)
+    block.print_cycle_info(block_vars, current_time, dt)
 
     for stage in range(len(block.intg.stages)):
-        block.forward(dt, stage, block_vars)
+        block.forward(block_vars, dt, stage)
 
     current_time += dt
     block.make_outputs(block_vars, current_time)
+    if check_signal():
+        break
+
+block.finalize(block_vars, current_time)

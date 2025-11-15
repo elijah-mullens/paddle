@@ -208,3 +208,9 @@ __marimo__/
 
 # docker
 docker-compose.override.yaml
+
+# netcdf outputs
+*.nc
+
+# restart outputs
+*.restart
