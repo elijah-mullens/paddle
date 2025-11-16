@@ -1,0 +1,74 @@
+reference-state:
+  Tref: 0.
+  Pref: 1.e5
+
+species:
+  - name: dry
+    composition: {O: 0.42, N: 1.56, Ar: 0.01}
+    cv_R: 2.5
+
+geometry:
+  type: cartesian
+  bounds: {x1min: 0., x1max: 6.4e3, x2min: 0., x2max: 25.6e3, x3min: 0., x3max: 25.6e3}
+  cells: {nx1: 64, nx2: 256, nx3: 1, nghost: 3}
+
+dynamics:
+  equation-of-state:
+    type: ideal-gas
+    density-floor:  1.e-10
+    pressure-floor: 1.e-10
+    limiter: false
+
+  vertical-projection:
+    type: temperature
+    pressure-margin: 1.e-6
+
+  reconstruct:
+    vertical: {type: weno5, scale: false, shock: false}
+    horizontal: {type: weno5, scale: false, shock: false}
+
+  riemann-solver:
+    type: lmars
+
+boundary-condition:
+  internal:
+    solid-density: 1.e3
+    solid-pressure: 1.e9
+    max-iter: 5
+
+  external:
+    x1-inner: reflecting
+    x1-outer: reflecting
+    x2-inner: reflecting
+    x2-outer: reflecting
+    x3-inner: reflecting
+    x3-outer: reflecting
+
+integration:
+  type: rk3
+  cfl: 0.9
+  implicit-scheme: 0
+  nlim: -1
+  tlim: 900
+  ncycle_out: 10
+
+outputs:
+  - type: restart
+    dt: 300.
+  - type: netcdf
+    variables: [prim, uov]
+    dt: 30.
+
+forcing:
+  const-gravity:
+    grav1: -9.8
+
+problem:
+  p0: 1.e5
+  Ts: 300.
+  xc: 0.
+  xr: 4.e3
+  zc: 3.e3
+  zr: 2.e3
+  dT: -15.
+  K: 75.
