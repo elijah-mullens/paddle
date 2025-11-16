@@ -1,5 +1,5 @@
 import torch
-from snapy import MeshBlockOptions, MeshBlock, check_signal
+from snapy import MeshBlockOptions, MeshBlock
 from snapy import kIDN, kIPR, kIV1, kIV2, kIV3
 
 # use cuda if available
@@ -55,9 +55,13 @@ while not block.intg.stop(block.inc_cycle(), current_time):
     for stage in range(len(block.intg.stages)):
         block.forward(block_vars, dt, stage)
 
+    err = block.check_redo(block_vars)
+    if err > 0:
+        continue  # redo current step
+    if err < 0:
+        break  # terminate
+
     current_time += dt
     block.make_outputs(block_vars, current_time)
-    if check_signal():
-        break
 
 block.finalize(block_vars, current_time)
