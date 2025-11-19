@@ -11,9 +11,7 @@ services:
       - USERNAME=${USER}
       - USER_UID=${USER_UID}
       - USER_GID=${USER_GID}
-    # This is volatile
-    # Make sure that you use override.yaml for permanent changes
-    working_dir: /paddle_docker_workspace
+    working_dir: /workspace
     tty: true
     stdin_open: true
     ports:
