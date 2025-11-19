@@ -1,6 +1,12 @@
 services:
   dev:
     volumes:
-      # This is your main working directory
-      # (lhs:rhs, lhs = workspace on physical machine : rhs = virtual machine)
-      - path_to_physical_directory/paddle_docker_workspace:/paddle_docker_workspace
+      # This maps your physical locations to locations in docker
+      # (lhs:rhs, lhs = workspace on physical machine : rhs = workspace on virtual machine)
+      # Use ${HOME} for your home directory
+      # You can rename "workspace" or "data" to anything else
+      # It is prefered that you seperate the soruce code and the results
+      - path_to_work_directory/:/workspace
+      - path_to_data_directory/:/data
+    # This is your main workspace where you can modify your source code
+    working_dir: /workspace
