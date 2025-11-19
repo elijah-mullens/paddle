@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ripgrep fd-find unzip neovim \
       clangd \
       nodejs npm \
+      libnetcdf-dev nco ncview \
       && rm -rf /var/lib/apt/lists/*
 
 # Make fd available as `fd` (Ubuntu calls it fdfind)
