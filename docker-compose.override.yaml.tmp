@@ -3,10 +3,14 @@ services:
     volumes:
       # This maps your physical locations to locations in docker
       # (lhs:rhs, lhs = workspace on physical machine : rhs = workspace on virtual machine)
-      # Use ${HOME} for your home directory
-      # You can rename "workspace" or "data" to anything else
-      # It is prefered that you seperate the soruce code and the results
-      - path_to_work_directory/:/workspace
-      - path_to_data_directory/:/data
+      # Here we set up two directorys: your docker workspace directory that stores paddle
+      # (all py scripts and notebooks) 
+      # And your data directory, that stores large data products ('results')
+      # While this data directory won't always be used 
+      # (you can optionally have smaller outputs stored locally in the workspace directory)
+      # It is useful for very large data products, like those of gcm or mcmc scripts.
+      - path_to_physical_directory/paddle_docker_workspace:/paddle_docker_workspace
+      - path_to_physical_data_directory/:/paddke_docker_data_storage
+
     # This is your main workspace where you can modify your source code
-    working_dir: /workspace
+    working_dir: /paddle_docker_workspace
