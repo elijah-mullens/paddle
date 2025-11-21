@@ -3,6 +3,7 @@ from typing import Tuple
 import torch
 import snapy
 import kintera
+from snapy import kIDN, kIPR, kICY
 
 
 def integrate_neutral(
@@ -248,9 +249,9 @@ def setup_profile(
             xfrac /= xfrac.sum(dim=-1, keepdim=True)
         conc = thermo_x.compute("TPX->V", [temp, pres, xfrac])
 
-        w[snapy.index.ipr, ..., i] = pres
-        w[snapy.index.idn, ..., i] = thermo_x.compute("V->D", [conc])
-        w[snapy.index.icy :, ..., i] = thermo_x.compute("X->Y", [xfrac])
+        w[kIPR, ..., i] = pres
+        w[kIDN, ..., i] = thermo_x.compute("V->D", [conc])
+        w[kICY:, ..., i] = thermo_x.compute("X->Y", [xfrac])
 
         dz = coord.buffer("dx1f")[i]
         if method.split("-")[0] == "dry":
@@ -279,7 +280,7 @@ def setup_profile(
         dz = coord.buffer("dx1f")[i]
         pres *= torch.exp(-grav * mu * dz / (kintera.constants.Rgas * temp))
         conc = thermo_x.compute("TPX->V", [temp, pres, xfrac])
-        w[snapy.index.ipr, ..., i] = pres
-        w[snapy.index.idn, ..., i] = thermo_x.compute("V->D", [conc])
-        w[snapy.index.icy :, ..., i] = thermo_x.compute("X->Y", [xfrac])
+        w[kIPR, ..., i] = pres
+        w[kIDN, ..., i] = thermo_x.compute("V->D", [conc])
+        w[kICY:, ..., i] = thermo_x.compute("X->Y", [xfrac])
     return w

@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import kintera
 import snapy
+from snapy import kIPR, kICY
 
 
 def write_profile(
@@ -47,7 +48,7 @@ def write_profile(
         raise ValueError("hydro_w must have shape (N, 1, 1, L).")
 
     # calculate a height grid
-    pres = hydro_w[snapy.index.ipr, ...].squeeze() / 1.0e5  # Pa -> bar
+    pres = hydro_w[kIPR, ...].squeeze() / 1.0e5  # Pa -> bar
     zlev_func = interp1d(
         pres.log().cpu().numpy(),
         coord.buffer("x1v").cpu().numpy(),
@@ -61,7 +62,7 @@ def write_profile(
     temp = eos.compute("W->T", (hydro_w,)).squeeze()
 
     # calculate mole fractions
-    xfrac = thermo_y.compute("Y->X", (hydro_w[snapy.index.icy :, ...],)).squeeze()
+    xfrac = thermo_y.compute("Y->X", (hydro_w[kICY :, ...],)).squeeze()
 
     # calculate heat capacity
     conc = thermo_x.compute("TPX->V", (temp, pres * 1.0e5, xfrac))
