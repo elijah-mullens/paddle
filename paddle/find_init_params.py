@@ -1,6 +1,7 @@
 from scipy.interpolate import interp1d
 import snapy
 import numpy as np
+from snapy import kIPR
 
 from .setup_profile import setup_profile
 
@@ -46,7 +47,7 @@ def find_init_params(
         temp = eos.compute("W->T", (w,)).squeeze()
 
         # calculate 1D pressure
-        pres = w[snapy.index.ipr, ...].squeeze()
+        pres = w[kIPR, ...].squeeze()
 
         # temperature function
         t_func = interp1d(

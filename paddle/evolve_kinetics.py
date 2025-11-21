@@ -1,6 +1,7 @@
 import torch
 import snapy
 import kintera
+from snapy import kIDN, kIPR, kICY
 
 
 def evolve_kinetics(
@@ -27,8 +28,8 @@ def evolve_kinetics(
     thermo_y = block.module("hydro.eos.thermo")
 
     temp = eos.compute("W->T", (hydro_w,))
-    pres = hydro_w[snapy.index.ipr]
-    xfrac = thermo_y.compute("Y->X", (hydro_w[snapy.index.icy :],))
+    pres = hydro_w[kIPR]
+    xfrac = thermo_y.compute("Y->X", (hydro_w[kICY:],))
     conc = thermo_x.compute("TPX->V", (temp, pres, xfrac))
     cp_vol = thermo_x.compute("TV->cp", (temp, conc))
 
