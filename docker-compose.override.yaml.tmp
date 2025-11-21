@@ -1,12 +1,22 @@
 services:
   dev:
+    build:
+      dockerfile: docker/Dockerfile.cuda
+      args:
+        CUDA_VER: "12.9.1"
+    deploy:
+        resources:
+          reservations:
+            devices:
+              # Activate this if your system supports GPU
+              - capabilities: [gpu]
     volumes:
       # This maps your physical locations to locations in docker
       # (lhs:rhs, lhs = workspace on physical machine : rhs = workspace on virtual machine)
       # Here we set up two directorys: your docker workspace directory that stores paddle
-      # (all py scripts and notebooks) 
+      # (all py scripts and notebooks)
       # And your data directory, that stores large data products ('results')
-      # While this data directory won't always be used 
+      # While this data directory won't always be used
       # (you can optionally have smaller outputs stored locally in the workspace directory)
       # It is useful for very large data products, like those of gcm or mcmc scripts.
       - path_to_physical_directory/paddle_docker_workspace:/paddle_docker_workspace

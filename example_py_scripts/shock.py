@@ -42,7 +42,7 @@ solid = torch.where(r1 < 0.1, 1, 0).to(torch.bool)
 block_vars = {}
 block_vars["hydro_w"] = w
 block_vars["solid"] = solid
-block_vars = block.initialize(block_vars)
+block_vars, current_time = block.initialize(block_vars)
 
 # integration
 current_time = 0.0
