@@ -11,7 +11,9 @@ services:
       - USERNAME=${USER}
       - USER_UID=${USER_UID}
       - USER_GID=${USER_GID}
-    working_dir: /workspace
+    volumes:
+      - .:/paddle
+    working_dir: .
     tty: true
     stdin_open: true
     ports:
