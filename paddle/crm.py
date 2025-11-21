@@ -4,7 +4,6 @@ import time
 import kintera
 import numpy as np
 from snapy import (
-    index,
     MeshBlockOptions,
     MeshBlock,
     OutputOptions,
@@ -16,6 +15,7 @@ from kintera import (
     KineticsOptions,
     Kinetics,
 )
+from snapy import kIDN, kICY
 
 if __name__ == "__main__":
     # input file
@@ -59,7 +59,7 @@ if __name__ == "__main__":
 
         if count % 1 == 0:
             print(f"count = {count}, dt = {dt}, time = {current_time}")
-            print("mass = ", u[interior][index.idn].sum())
+            print("mass = ", u[interior][kIDN].sum())
 
             for out in outs:
                 out.increment_file_number()
@@ -70,7 +70,7 @@ if __name__ == "__main__":
             block.forward(dt, stage)
 
         # evolve kinetics
-        u[index.icy :] += evolve_kinetics(block, kinet, thermo_x)
+        u[kICY :] += evolve_kinetics(block, kinet, thermo_x)
 
         current_time += dt
         count += 1

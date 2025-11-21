@@ -13,9 +13,9 @@ geometry:
   cells: {nx1: 300, nx2: 200, nx3: 1, nghost: 3}
 
 distribute:
-  backend: gloo
+  backend: nccl
   layout: slab
-  nb2: 4
+  nb2: 1
   nb3: 1
   verbose: false
 
