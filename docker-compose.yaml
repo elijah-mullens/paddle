@@ -13,7 +13,7 @@ services:
       - USER_GID=${USER_GID}
     volumes:
       - .:/paddle
-    working_dir: .
+    working_dir: /paddle
     tty: true
     stdin_open: true
     ports:
