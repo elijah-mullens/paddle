@@ -61,6 +61,11 @@ https://github.com/elijah-mullens/paddle
 git config credential.helper 'cache --timeout=86400'
 ```
 
+### Create a python virtual environment
+```bash
+python -m venv .pyenv
+```
+
 ### Install paddle package
 
 ### Install pre-commit hook
