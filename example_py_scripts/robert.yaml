@@ -12,6 +12,13 @@ geometry:
   bounds: {x1min: 0., x1max: 1.5e3, x2min: 0., x2max: 1.e3, x3min: -0.5, x3max: 0.5}
   cells: {nx1: 300, nx2: 200, nx3: 1, nghost: 3}
 
+distribute:
+  backend: gloo
+  layout: slab
+  nb2: 4
+  nb3: 1
+  verbose: false
+
 dynamics:
   equation-of-state:
     type: ideal-gas
@@ -24,8 +31,8 @@ dynamics:
     pressure-margin: 1.e-6
 
   reconstruct:
-    vertical: {type: weno5, scale: false, shock: true}
-    horizontal: {type: weno5, scale: false, shock: true}
+    vertical: {type: weno5, scale: false, shock: false}
+    horizontal: {type: weno5, scale: false, shock: false}
 
   riemann-solver:
     type: lmars

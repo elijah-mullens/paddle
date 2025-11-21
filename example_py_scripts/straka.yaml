@@ -12,6 +12,13 @@ geometry:
   bounds: {x1min: 0., x1max: 6.4e3, x2min: 0., x2max: 25.6e3, x3min: 0., x3max: 25.6e3}
   cells: {nx1: 64, nx2: 256, nx3: 1, nghost: 3}
 
+distribute:
+  backend: gloo
+  layout: slab
+  nb2: 1
+  nb3: 1
+  verbose: false
+
 dynamics:
   equation-of-state:
     type: ideal-gas

@@ -72,13 +72,12 @@ w[kIDN] = w[kIPR] / (Rd * temp)
 
 block_vars = {}
 block_vars["hydro_w"] = w
-block_vars = block.initialize(block_vars)
+block_vars, current_time = block.initialize(block_vars)
 
 block.set_user_output_func(call_user_output)
 
 # integration
 start_time = time.time()
-current_time = 0.0
 block.make_outputs(block_vars, current_time)
 
 while not block.intg.stop(block.inc_cycle(), current_time):
@@ -98,4 +97,3 @@ while not block.intg.stop(block.inc_cycle(), current_time):
     block.make_outputs(block_vars, current_time)
 
 block.finalize(block_vars, current_time)
-print("elapsed time = ", time.time() - start_time)
