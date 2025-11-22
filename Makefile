@@ -32,7 +32,7 @@ down: ## Stop and remove docker containers
 ps: ## Show container status
 	@docker compose ps
 
-start: ## Open a bash shell inside the 'dev' container as the host user
+start: ## Open a bash shell inside the 'dev' container as the host user, exit without error
 	@docker compose exec --user $(UID):$(GID) dev bash || true
 
 build: env ## Build (or rebuild) the 'dev' container and start it
