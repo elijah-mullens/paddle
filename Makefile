@@ -1,7 +1,7 @@
 ENV_FILE := .env
 UID := $$(id -u)
 GID := $$(id -g)
-GITCONFIG := "$${HOME}/.gitconfig"
+GITCONFIG := $${HOME}/.gitconfig
 
 .PHONY: help env up down ps start build
 
