@@ -34,7 +34,7 @@ done
 echo 'export EDITOR=nvim; export VISUAL=nvim' >> "${HOME_DIR}/.bashrc" || true
 chown "${USER_UID}:${USER_GID}" "${HOME_DIR}/.bashrc" || true
 
-# Drop privileges   (use tini/gosu if installed; otherwise su-exec/ runuser)
+# Drop privileges (use tini/gosu if installed; otherwise su-exec/ runuser)
 if command -v gosu >/dev/null 2>&1; then
   exec gosu "${USER_UID}:${USER_GID}" "$@"
 else
