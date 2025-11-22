@@ -13,8 +13,14 @@ services:
       - USER_GID=${USER_GID}
     volumes:
       - .:/paddle
+      - ${GITCONFIG}:/etc/gitconfig
     working_dir: /paddle
     tty: true
     stdin_open: true
     ports:
       - "8888:8888"
+    command: >
+      bash -c "
+        git config --global --add safe.directory /paddle &&
+        bash
+      "
