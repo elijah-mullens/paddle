@@ -38,6 +38,14 @@ env: ## Generate the .env file with git configs first, then user info
 
 up: env ## Start docker containers in the background
 	@docker compose up -d
+	@docker compose exec dev bash -c '\
+		USER_HOME=$$(eval echo ~$$USERNAME); \
+		if [ -f /etc/git-credentials ] && [ ! -f $$USER_HOME/.git-credentials ]; then \
+			cp /etc/git-credentials $$USER_HOME/.git-credentials; \
+			chown $${USER_UID}:$${USER_GID} $$USER_HOME/.git-credentials; \
+			git config --global credential.helper store; \
+		fi \
+	'
 
 down: env ## Stop and remove docker containers
 	@docker compose down
