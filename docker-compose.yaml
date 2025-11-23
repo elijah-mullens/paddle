@@ -22,5 +22,6 @@ services:
     command: >
       bash -c "
         git config --global --add safe.directory /paddle &&
+        git config --global credential.helper store &&
         bash
       "
