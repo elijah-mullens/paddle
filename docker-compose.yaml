@@ -14,14 +14,9 @@ services:
     volumes:
       - .:/paddle
       - ${GITCONFIG}:/etc/gitconfig
+      - ${GITCREDENTIALS}:/etc/git-credentials
     working_dir: /paddle
     tty: true
     stdin_open: true
     ports:
       - "8888:8888"
-    command: >
-      bash -c "
-        git config --global --add safe.directory /paddle &&
-        git config --global credential.helper store &&
-        bash
-      "
