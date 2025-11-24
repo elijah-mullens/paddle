@@ -1,6 +1,6 @@
 # Paddle
 
-Python Atmospheric Dynamics: Discovering and Learning about Exoplanets. An open-source, user-friendly python version of canoe.
+Python Atmospheric Dynamics: Discovering and Learning about Exoplanets. An open-source, user-friendly Python version of [canoe](https://github.com/chengcli/canoe).
 
 ## Test the package
 
@@ -41,7 +41,9 @@ You may need to install Docker to compose up and install the package inside a co
    sudo systemctl start docker
    ```
 
-After installing docker, you can use the Makefile commands below to manage your docker containers from the terminal. By default, the container will mount the current directory to `/paddle` inside the container. Mounting a local directory allows you to edit files on your local machine while running and testing the code inside the container; or use the container as a development environment and sync files to your local machine.
+After installing Docker, you can use the Makefile commands below to manage your docker containers from the terminal. By default, the container will mount the current directory to `/paddle` inside the container.
+
+> Mounting a local directory allows you to edit files on your local machine while running and testing the code inside the container; or use the container as a development environment and sync files to your local machine.
 
 If you want to change the mounted directory, you can create a `docker-compose.overrides.yml` file based on the provided `docker-compose.overrides.yml.tmp` template file.
 
@@ -69,7 +71,7 @@ If you want to change the mounted directory, you can create a `docker-compose.ov
   make build
   ```
 
-If you use VSCode, it is recommended to install the [Remote Development](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack) extension, [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) and [Container Tools](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-containers) for a better development experience within a container.
+If you use VSCode, it is recommended to install extensions including [Remote Development](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.vscode-remote-extensionpack), [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) and [Container Tools](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-containers) for a better development experience within a container.
 
 1. Install the extensions mentioned above.
 2. Start the container using `make up` or `make start`.
@@ -83,7 +85,7 @@ If you use VSCode, it is recommended to install the [Remote Development](https:/
 
    <img src="docs/_static/readme-open-folder.png" width="500" style="vertical-align: top;">
 
-## For Developer
+## For Developers
 
 Follow the steps below to set up your development environment.
 
@@ -124,5 +126,4 @@ Follow the steps below to set up your development environment.
 
 ## Troubleshooting
 
-1. If you do not have Docker Compose,
-   remove your current Docker installation, which could be docker or docker.io, and re-install it following the guide provided in the "Develop with Docker" section above.
+1. If you have Docker installed but do not have Docker Compose, remove your current Docker installation, which could be docker or docker.io, and re-install it following the guide provided in the [Develop with Docker](#develop-with-docker) section above.
