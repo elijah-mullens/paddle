@@ -75,7 +75,7 @@ If you use VSCode, it is recommended to install the [Remote Development](https:/
 2. Start the container using `make up` or `make start`.
 3. Open VSCode and click on the "Containers" icon on the left sidebar. Note that if you have too many extensions installed, the icon may be hidden under the "..." menu.
 
-   <img src="docs/_static/readme-extension.png" width="200" style="vertical-align: top;"> 
+   <img src="docs/_static/readme-extension.png" width="200" style="vertical-align: top;">
    <img src="docs/_static/readme-attach.png" width="200" style="vertical-align: top;">
 
 4. Right click on the running container named `paddle` with a green triangle icon (indicating it is running), and select "Attach Visual Studio Code" (see above images). This will open a new VSCode window connected to the container.
