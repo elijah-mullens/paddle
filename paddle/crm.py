@@ -70,7 +70,7 @@ if __name__ == "__main__":
             block.forward(dt, stage)
 
         # evolve kinetics
-        u[kICY :] += evolve_kinetics(block, kinet, thermo_x)
+        u[kICY:] += evolve_kinetics(block, kinet, thermo_x)
 
         current_time += dt
         count += 1

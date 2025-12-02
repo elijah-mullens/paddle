@@ -62,7 +62,7 @@ def write_profile(
     temp = eos.compute("W->T", (hydro_w,)).squeeze()
 
     # calculate mole fractions
-    xfrac = thermo_y.compute("Y->X", (hydro_w[kICY :, ...],)).squeeze()
+    xfrac = thermo_y.compute("Y->X", (hydro_w[kICY:, ...],)).squeeze()
 
     # calculate heat capacity
     conc = thermo_x.compute("TPX->V", (temp, pres * 1.0e5, xfrac))

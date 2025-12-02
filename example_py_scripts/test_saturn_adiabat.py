@@ -14,7 +14,7 @@ from pathlib import Path
 
 def setup_saturn_profile():
     # path = resources.files("paddle") / "data" / "saturn1d.yaml"
-    #path = Path("data") / "saturn1d.yaml"
+    # path = Path("data") / "saturn1d.yaml"
     path = "saturn1d.yaml"
     print(f"Reading input file: {path}")
 
