@@ -15,7 +15,7 @@ geometry:
 distribute:
   backend: gloo
   layout: slab
-  nb2: 4
+  nb2: 1
   nb3: 1
   verbose: false
 
