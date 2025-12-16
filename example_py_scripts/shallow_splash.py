@@ -1,12 +1,15 @@
 import torch
 import math
 import time
+import numpy as np
+from snapy.distributed import get_rank, get_layout
+from snapy.coord import get_cs_face_name, cs_ab_to_lonlat
 from snapy import MeshBlockOptions, MeshBlock
 from snapy import kIDN, kIPR, kIV2, kIV3
 
-phi = 10.0
-uphi = 10.0
-dphi = 2.0
+phi = 500.0
+dphi = 10.0
+radius = 5.0e5
 
 # use cuda if available
 if torch.cuda.is_available():
@@ -15,7 +18,7 @@ else:
     device = torch.device("cpu")
 
 # set hydrodynamic options
-op = MeshBlockOptions.from_yaml("shallow_yz.yaml", verbose=False)
+op = MeshBlockOptions.from_yaml("shallow_splash.yaml", verbose=False)
 
 # initialize block
 block = MeshBlock(op)
@@ -25,10 +28,16 @@ block.to(device)
 coord = block.module("hydro.coord")
 eos = block.module("hydro.eos")
 
-# set initial condition
-x3v, x2v, _ = torch.meshgrid(
+# set coordinates
+r = get_rank()
+layout = get_layout()
+rx, ry, face_id = layout.loc_of(r)
+face = get_cs_face_name(face_id)
+
+beta, alpha, r_planet = torch.meshgrid(
     coord.buffer("x3v"), coord.buffer("x2v"), coord.buffer("x1v"), indexing="ij"
 )
+lon, lat = cs_ab_to_lonlat(face, alpha, beta)
 
 # dimensions
 nc3 = coord.buffer("x3v").shape[0]
@@ -38,10 +47,12 @@ nvar = 4
 
 w = torch.zeros((nvar, nc3, nc2, nc1), device=device)
 
+dist = r_planet * (np.pi / 2.0 - lat)
+
 w[kIDN] = phi
-w[kIDN][torch.logical_and(x3v > 0.0, x3v < 5.0)] += dphi
-w[kIV3] = torch.where(x2v > 0.0, -uphi / w[0], uphi / w[0])
+w[kIDN][torch.logical_and(dist < radius, lat > np.pi / 4.0)] += dphi
 w[kIV2] = 0.0
+w[kIV3] = 0.0
 
 block_vars = {}
 block_vars["hydro_w"] = w
