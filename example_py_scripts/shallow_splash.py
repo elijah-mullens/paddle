@@ -26,7 +26,6 @@ block.to(device)
 
 # get handles to modules
 coord = block.module("hydro.coord")
-eos = block.module("hydro.eos")
 
 # set coordinates
 r = get_rank()
