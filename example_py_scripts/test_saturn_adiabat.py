@@ -18,7 +18,7 @@ def setup_saturn_profile():
     path = "saturn1d.yaml"
     print(f"Reading input file: {path}")
 
-    op_block = MeshBlockOptions.from_yaml(str(path))
+    op_block = MeshBlockOptions.from_yaml(str(path), verbose=False)
     block = MeshBlock(op_block)
 
     param = {

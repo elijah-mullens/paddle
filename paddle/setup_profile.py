@@ -34,7 +34,7 @@ def integrate_neutral(
     pres_ad = pres.clone()
     xfrac_ad = xfrac.clone()
 
-    thermo_x.extrapolate_ad(temp_ad, pres_ad, xfrac_ad, grav, dz)
+    thermo_x.extrapolate_dz(temp_ad, pres_ad, xfrac_ad, dz, grav=grav)
     conc_ad = thermo_x.compute("TPX->V", [temp_ad, pres_ad, xfrac_ad])
     rho_ad = thermo_x.compute("V->D", [conc_ad])
     rho_bar = 0.5 * (rho + rho_ad)
@@ -231,7 +231,7 @@ def setup_profile(
     dz = coord.buffer("dx1f")[ifirst]
 
     # half a grid to cell center
-    thermo_x.extrapolate_ad(temp, pres, xfrac, grav, dz / 2.0, verbose=verbose)
+    thermo_x.extrapolate_dz(temp, pres, xfrac, dz / 2.0, grav=grav, verbose=verbose)
 
     # adiabatic extrapolation
     if method == "isothermal":
@@ -261,7 +261,7 @@ def setup_profile(
         elif method.split("-")[0] == "neutral":
             temp, pres, xfrac = integrate_neutral(thermo_x, temp, pres, xfrac, grav, dz)
         else:
-            thermo_x.extrapolate_ad(temp, pres, xfrac, grav, dz, verbose=verbose)
+            thermo_x.extrapolate_dz(temp, pres, xfrac, dz, grav=grav, verbose=verbose)
 
         if torch.any(temp < Tmin):
             i_isothermal = i + 1

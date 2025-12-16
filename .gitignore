@@ -218,3 +218,6 @@ docker-compose.override.yaml
 # python environment
 .env
 .pyenv
+
+# pt file
+*.pt
