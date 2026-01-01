@@ -41,13 +41,12 @@ block = MeshBlock(op)
 block.to(device)
 
 # get handles to modules
-coord = block.module("hydro.coord")
-thermo = block.module("hydro.eos.thermo")
+coord = block.module("coord")
 eos = block.module("hydro.eos")
 
 # thermodynamics
-Rd = kintera.constants.Rgas / kintera.species_weights()[0]
-cv = kintera.species_cref_R()[0] * Rd
+Rd = kintera.constants.Rgas / eos.species_weight()
+cv = eos.species_cv_ref()
 cp = cv + Rd
 
 # setup a meshgrid for simulation

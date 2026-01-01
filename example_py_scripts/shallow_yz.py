@@ -22,7 +22,7 @@ block = MeshBlock(op)
 block.to(device)
 
 # get handles to modules
-coord = block.module("hydro.coord")
+coord = block.module("coord")
 eos = block.module("hydro.eos")
 
 # set initial condition

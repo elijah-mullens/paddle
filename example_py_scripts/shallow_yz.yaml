@@ -28,14 +28,14 @@ boundary-condition:
     x1-outer: reflecting
     x2-inner: reflecting
     x2-outer: reflecting
-    x3-inner: reflecting
-    x3-outer: reflecting
+    x3-inner: periodic
+    x3-outer: periodic
 
 integration:
   type: rk3
   cfl: 0.9
   nlim: -1
-  tlim: 10
+  tlim: 9
   ncycle_out: 10
 
 outputs:
