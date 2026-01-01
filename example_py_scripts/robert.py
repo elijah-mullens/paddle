@@ -1,6 +1,7 @@
 import torch
 import math
 import time
+import kintera
 from snapy import MeshBlockOptions, MeshBlock
 from snapy import kIDN, kIPR
 
@@ -22,9 +23,6 @@ yc = 0.0
 zc = 260.0
 s = 100.0
 a = 50.0
-grav = 9.8
-Rd = 287.0
-gamma = 1.4
 uniform_bubble = False
 
 # use cuda if available
@@ -39,10 +37,13 @@ block = MeshBlock(op)
 block.to(device)
 
 # get handles to modules
-coord = block.module("hydro.coord")
-thermo = block.module("hydro.eos.thermo")
+coord = block.module("coord")
+eos = block.module("hydro.eos")
+grav = -block.options.hydro().grav().grav1()
 
 # thermodynamics
+gamma = eos.options.gammad()
+Rd = kintera.constants.Rgas / eos.options.weight()
 cp = gamma / (gamma - 1.0) * Rd
 
 # set initial condition

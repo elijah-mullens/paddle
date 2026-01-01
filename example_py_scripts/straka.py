@@ -22,9 +22,6 @@ xr = 4.0e3
 zc = 3.0e3
 zr = 2.0e3
 dT = -15.0
-grav = 9.8
-Rd = 287.0
-gamma = 1.4
 K = 75.0
 
 # use cuda if available
@@ -43,9 +40,10 @@ block.to(device)
 # get handles to modules
 coord = block.module("coord")
 eos = block.module("hydro.eos")
+grav = -block.options.hydro().grav().grav1()
 
 # thermodynamics
-Rd = kintera.constants.Rgas / eos.species_weight()
+Rd = kintera.constants.Rgas / eos.options.weight()
 cv = eos.species_cv_ref()
 cp = cv + Rd
 
