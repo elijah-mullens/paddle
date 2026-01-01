@@ -25,7 +25,7 @@ block = MeshBlock(op)
 block.to(device)
 
 # get handles to modules
-coord = block.module("hydro.coord")
+coord = block.module("coord")
 
 # set coordinates
 r = get_rank()
