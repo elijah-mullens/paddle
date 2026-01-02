@@ -76,7 +76,10 @@ def run_with(infile: str):
         if err < 0:
             break  # terminate
 
-        # evolve_kinetics(block_vars, eos, thermo_x, thermo_y, kinet, dt)
+        del_rho = evolve_kinetics(
+            block_vars["hydro_w"], eos, thermo_x, thermo_y, kinet, dt
+        )
+        block_vars["hydro_u"][kICY:] += del_rho
 
         current_time += dt
         block.make_outputs(block_vars, current_time)
