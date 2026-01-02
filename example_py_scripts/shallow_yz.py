@@ -39,7 +39,7 @@ w = torch.zeros((nvar, nc3, nc2, nc1), device=device)
 
 w[kIDN] = phi
 w[kIDN][torch.logical_and(x3v > 0.0, x3v < 5.0)] += dphi
-w[kIV3] = torch.where(x2v > 0.0, -uphi / w[0], uphi / w[0])
+w[kIV3] = torch.where(x2v > 0.0, -uphi / w[kIDN], uphi / w[kIDN])
 w[kIV2] = 0.0
 
 block_vars = {}
