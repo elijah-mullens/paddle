@@ -1,4 +1,3 @@
-
 import matplotlib.pyplot as plt
 from cubed_sphere_utils import (
     make_poly_patch,
