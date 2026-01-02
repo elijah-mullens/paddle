@@ -1,6 +1,5 @@
 import torch
 import math
-import time
 import kintera
 from snapy import MeshBlockOptions, MeshBlock
 from snapy import kIDN, kIPR
@@ -79,7 +78,6 @@ block_vars, current_time = block.initialize(block_vars)
 block.set_user_output_func(call_user_output)
 
 # integration
-start_time = time.time()
 block.make_outputs(block_vars, current_time)
 
 while not block.intg.stop(block.inc_cycle(), current_time):

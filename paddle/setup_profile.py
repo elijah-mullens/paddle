@@ -192,7 +192,7 @@ def setup_profile(
     Tmin = param.get("Tmin", 0.0)
 
     # get handles to modules
-    coord = block.module("hydro.coord")
+    coord = block.module("coord")
     thermo_y = block.module("hydro.eos.thermo")
 
     # get coordinates
@@ -224,23 +224,23 @@ def setup_profile(
 
     # start and end indices for the vertical direction
     # excluding ghost cells
-    ifirst = coord.ifirst()
-    ilast = coord.ilast()
+    il = coord.il()
+    iu = coord.iu()
 
     # vertical grid distance of the first cell
-    dz = coord.buffer("dx1f")[ifirst]
+    dz = coord.buffer("dx1f")[il]
 
     # half a grid to cell center
     thermo_x.extrapolate_dz(temp, pres, xfrac, dz / 2.0, grav=grav, verbose=verbose)
 
     # adiabatic extrapolation
     if method == "isothermal":
-        i_isothermal = ifirst
-        ifirst = ilast
+        i_isothermal = il
+        il = iu
     else:
-        i_isothermal = ilast
+        i_isothermal = iu
 
-    for i in range(ifirst, ilast):
+    for i in range(il, iu + 1):
         # drop clouds fractions
         if method.split("-")[0] != "moist":
             for cid in thermo_x.options.cloud_ids():
@@ -268,7 +268,7 @@ def setup_profile(
             break
 
     # isothermal extrapolation
-    for i in range(i_isothermal, ilast):
+    for i in range(i_isothermal, iu + 1):
         # drop clouds fractions
         if method.split("-")[0] != "moist":
             for cid in thermo_x.options.cloud_ids():

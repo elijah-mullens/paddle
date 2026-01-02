@@ -22,18 +22,18 @@ def setup_saturn_profile():
     block = MeshBlock(op_block)
 
     param = {
-        "Ts": 600.0,
+        "Ts": 800.0,
         "Ps": 100.0e5,
         "Tmin": 85.0,
-        "xH2O": 8.91e-3,
+        "xH2O": 4.91e-1,
         "xNH3": 3.52e-4,
         "xH2S": 8.08e-5,
         "grav": 10.44,
     }
 
     # method = "pseudo-adiabat"
-    # method = "moist-adiabat"
-    method = "dry-adiabat"
+    method = "moist-adiabat"
+    # method = "dry-adiabat"
 
     param = find_init_params(
         block,
@@ -43,10 +43,10 @@ def setup_saturn_profile():
         method=method,
         max_iter=50,
         ftol=1.0e-2,
-        verbose=False,
+        verbose=True,
     )
 
-    w = setup_profile(block, param, method=method)
+    w = setup_profile(block, param, method=method, verbose=True)
 
     thermo_y = block.module("hydro.eos.thermo")
     thermo_x = ThermoX(thermo_y.options)

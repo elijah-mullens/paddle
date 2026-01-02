@@ -8,27 +8,27 @@ species:
     cv_R: 2.5
 
 geometry:
-  type: gnomonic-equiangle
+  type: cartesian
 
   bounds:
-    x1min: 69911000
-    x1max: 70211000
-    x2min_pi: -0.25
-    x2max_pi: 0.25
-    x3min_pi: -0.25
-    x3max_pi: 0.25
+    x1min: 0.
+    x1max: 300.e3
+    x2min: 0.
+    x2max: 2400.e3
+    x3min: 0.
+    x3max: 2400.e3
 
   cells:
     nx1: 100
-    nx2: 48
-    nx3: 48
+    nx2: 200
+    nx3: 200
     nghost: 3
 
 distribute:
   backend: gloo
-  layout: cubed-sphere
-  nb2: 1
-  nb3: 1
+  layout: slab
+  nb2: 2
+  nb3: 2
   verbose: false
 
 dynamics:
@@ -56,15 +56,15 @@ boundary-condition:
   external:
     x1-inner: reflecting
     x1-outer: reflecting
-    x2-inner: custom
-    x2-outer: custom
-    x3-inner: custom
-    x3-outer: custom
+    x2-inner: periodic
+    x2-outer: periodic
+    x3-inner: periodic
+    x3-outer: periodic
 
 integration:
   type: rk3
   cfl: 0.45
-  implicit-scheme: 9
+  implicit-scheme: 1
   nlim: -1
   tlim: 100.e5
   ncycle_out: 1
@@ -74,10 +74,10 @@ outputs:
     dt: 10.E5
   - type: netcdf
     variables: [prim]
-    dt: 1.e4
+    dt: 1.E4
   - type: netcdf
     variables: [thermo]
-    dt: 1.e4
+    dt: 1.E4
 
 forcing:
   const-gravity:
@@ -87,3 +87,6 @@ problem:
   Ps: 100.e5
   Ts: 600.
   Tmin: 110.
+  xH2O: 3.e-3
+  xNH3: 3.2e-4
+  xH2S: 1.e-5

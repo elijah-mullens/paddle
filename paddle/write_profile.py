@@ -32,7 +32,7 @@ def write_profile(
     # useful modules
     thermo_y = block.module("hydro.eos.thermo")
     coord = block.module("hydro.coord")
-    eos = block.hydro.get_eos()
+    eos = block.module("hydro.eos")
 
     # handling mole fraction quantities
     thermo_x = kintera.ThermoX(thermo_y.options)
