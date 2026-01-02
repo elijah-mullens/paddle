@@ -4,7 +4,7 @@ import numpy as np
 from snapy.distributed import get_rank, get_layout
 from snapy.coord import get_cs_face_name, cs_ab_to_lonlat
 from snapy import MeshBlockOptions, MeshBlock
-from snapy import kIDN, kIPR, kIV2, kIV3
+from snapy import kIDN, kIV2, kIV3
 
 phi = 500.0
 dphi = 10.0
