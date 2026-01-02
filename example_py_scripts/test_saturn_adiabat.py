@@ -19,20 +19,21 @@ def setup_saturn_profile():
     print(f"Reading input file: {path}")
 
     op_block = MeshBlockOptions.from_yaml(str(path), verbose=False)
+    op_block.layout().master_port(29501)
     block = MeshBlock(op_block)
 
     param = {
         "Ts": 800.0,
         "Ps": 100.0e5,
         "Tmin": 85.0,
-        "xH2O": 4.91e-1,
+        "xH2O": 4.91e-2,
         "xNH3": 3.52e-4,
         "xH2S": 8.08e-5,
         "grav": 10.44,
     }
 
-    # method = "pseudo-adiabat"
-    method = "moist-adiabat"
+    method = "pseudo-adiabat"
+    # method = "moist-adiabat"
     # method = "dry-adiabat"
 
     param = find_init_params(
@@ -43,10 +44,10 @@ def setup_saturn_profile():
         method=method,
         max_iter=50,
         ftol=1.0e-2,
-        verbose=True,
+        verbose=False,
     )
 
-    w = setup_profile(block, param, method=method, verbose=True)
+    w = setup_profile(block, param, method=method, verbose=False)
 
     thermo_y = block.module("hydro.eos.thermo")
     thermo_x = ThermoX(thermo_y.options)

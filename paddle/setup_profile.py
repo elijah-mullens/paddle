@@ -231,7 +231,10 @@ def setup_profile(
     dz = coord.buffer("dx1f")[il]
 
     # half a grid to cell center
-    thermo_x.extrapolate_dz(temp, pres, xfrac, dz / 2.0, grav=grav, verbose=verbose)
+    rainout = method.split("-")[0] != "moist"
+    thermo_x.extrapolate_dz(
+        temp, pres, xfrac, dz / 2.0, grav=grav, verbose=verbose, rainout=rainout
+    )
 
     # adiabatic extrapolation
     if method == "isothermal":
@@ -261,7 +264,9 @@ def setup_profile(
         elif method.split("-")[0] == "neutral":
             temp, pres, xfrac = integrate_neutral(thermo_x, temp, pres, xfrac, grav, dz)
         else:
-            thermo_x.extrapolate_dz(temp, pres, xfrac, dz, grav=grav, verbose=verbose)
+            thermo_x.extrapolate_dz(
+                temp, pres, xfrac, dz, grav=grav, verbose=verbose, rainout=rainout
+            )
 
         if torch.any(temp < Tmin):
             i_isothermal = i + 1

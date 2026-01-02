@@ -30,8 +30,8 @@ def write_profile(
         None
     """
     # useful modules
+    coord = block.module("coord")
     thermo_y = block.module("hydro.eos.thermo")
-    coord = block.module("hydro.coord")
     eos = block.module("hydro.eos")
 
     # handling mole fraction quantities
