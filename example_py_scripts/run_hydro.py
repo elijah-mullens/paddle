@@ -34,7 +34,6 @@ def run_with(infile: str):
     block.to(device)
 
     # get handles to modules
-    coord = block.module("coord")
     thermo_y = block.module("hydro.eos.thermo")
     eos = block.module("hydro.eos")
     # thermo_y.options.max_iter(100)
