@@ -1,5 +1,4 @@
 import torch
-import math
 import time
 import numpy as np
 from snapy.distributed import get_rank, get_layout
