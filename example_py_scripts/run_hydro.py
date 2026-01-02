@@ -19,7 +19,8 @@ def call_user_output(bvars: dict[str, torch.Tensor]):
 
 
 def run_with(infile: str):
-    config = yaml.safe_load(open(infile, "r"))
+    with open(infile, "r") as f:
+        config = yaml.safe_load(f)
 
     # use cuda if available
     if torch.cuda.is_available():
