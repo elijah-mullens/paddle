@@ -11,8 +11,8 @@ from snapy import kIPR, kICY
 
 def write_profile(
     filename: str,
-    hydro_w: torch.Tensor,
     block: snapy.MeshBlock,
+    hydro_w: torch.Tensor,
     ref_pressure: float = 1.0e5,
     comment: Optional[str] = None,
 ) -> None:
@@ -30,9 +30,9 @@ def write_profile(
         None
     """
     # useful modules
+    coord = block.module("coord")
     thermo_y = block.module("hydro.eos.thermo")
-    coord = block.module("hydro.coord")
-    eos = block.hydro.get_eos()
+    eos = block.module("hydro.eos")
 
     # handling mole fraction quantities
     thermo_x = kintera.ThermoX(thermo_y.options)

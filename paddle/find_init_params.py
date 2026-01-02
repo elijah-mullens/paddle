@@ -34,7 +34,7 @@ def find_init_params(
         dict: Dictionary containing the found parameters: Ts, Ps, xH2O, xNH3, xH2S.
     """
     count = 0
-    eos = block.hydro.get_eos()
+    eos = block.module("hydro.eos")
 
     while count < max_iter:
         if verbose:

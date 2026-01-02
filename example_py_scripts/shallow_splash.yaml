@@ -1,0 +1,61 @@
+geometry:
+  type: gnomonic-equiangle
+
+  bounds:
+    x1min: 6371000
+    x1max: 6371001
+    x2min_pi: -0.25
+    x2max_pi: 0.25
+    x3min_pi: -0.25
+    x3max_pi: 0.25
+
+  cells:
+    nx1: 1
+    nx2: 48
+    nx3: 48
+    nghost: 3
+
+distribute:
+  backend: gloo
+  layout: cubed-sphere
+  nb2: 1
+  nb3: 1
+  verbose: false
+
+dynamics:
+  equation-of-state:
+    type: shallow-water
+
+  reconstruct:
+    vertical: {type: weno5, scale: false, shock: false}
+    horizontal: {type: weno5, scale: false, shock: false}
+
+  riemann-solver:
+    type: shallow-roe
+    dir: yz
+
+boundary-condition:
+  external:
+    x1-inner: reflecting
+    x1-outer: reflecting
+    x2-inner: custom
+    x2-outer: custom
+    x3-inner: custom
+    x3-outer: custom
+
+integration:
+  type: rk3
+  cfl: 0.9
+  nlim: -1
+  tlim: 8.64E5
+  ncycle_out: 10
+
+outputs:
+  - type: netcdf
+    variables: [prim]
+    dt: 1.E4
+
+problem:
+  phi: 500.
+  dphi: 10.
+  radius: 5.E5

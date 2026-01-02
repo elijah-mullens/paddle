@@ -1,0 +1,195 @@
+reference-state:
+  Tref: 0.
+  Pref: 1.e5
+
+species:
+  - name: dry
+    composition: {H: 1.5, He: 0.15}
+    cv_R: 2.5
+
+  - name: H2O
+    composition: {H: 2, O: 1}
+    cv_R: 2.5
+    u0_R: 0.
+
+  - name: NH3
+    composition: {H: 2, O: 1}
+    cv_R: 2.5
+    u0_R: 0.
+
+  - name: H2S
+    composition: {H: 2, S: 1}
+    cv_R: 2.5
+    u0_R: 0.
+
+  - name: H2O(l)
+    composition: {H: 2, O: 1}
+    cv_R: 9.0
+    u0_R: -3430.
+
+  - name: H2O(l,p)
+    composition: {H: 2, O: 1}
+    cv_R: 9.0
+    u0_R: -3430.
+
+  - name: NH3(s)
+    composition: {N: 1, H: 3}
+    cv_R: 9.0
+    u0_R: -5520.
+
+  - name: NH3(s,p)
+    composition: {N: 1, H: 3}
+    cv_R: 9.0
+    u0_R: -5520.
+
+  - name: NH4SH(s)
+    composition: {N: 1, H: 5, S: 1}
+    cv_R: 9.0
+    u0_R: -1.2e4
+
+  - name: NH4SH(s,p)
+    composition: {N: 1, H: 5, S: 1}
+    cv_R: 9.0
+    u0_R: -1.2e4
+
+geometry:
+  type: gnomonic-equiangle
+
+  bounds:
+    x1min: 69911000
+    x1max: 70211000
+    x2min_pi: -0.25
+    x2max_pi: 0.25
+    x3min_pi: -0.25
+    x3max_pi: 0.25
+
+  cells:
+    nx1: 100
+    nx2: 48
+    nx3: 48
+    nghost: 3
+
+distribute:
+  backend: gloo
+  layout: cubed-sphere
+  nb2: 1
+  nb3: 1
+  verbose: false
+
+dynamics:
+  equation-of-state:
+    type: ideal-moist
+    density-floor:  1.e-10
+    pressure-floor: 1.e-10
+    tracer-floor: 1.e-10
+    limiter: true
+    max-iter: 40
+    ftol: 1.e-6
+
+  vertical-projection:
+    type: temperature
+    pressure-margin: 1.e-6
+
+  reconstruct:
+    vertical: {type: weno5, scale: true, shock: true}
+    horizontal: {type: weno5, scale: true, shock: true}
+
+  riemann-solver:
+    type: hllc
+
+boundary-condition:
+  internal:
+    solid-density: 1.e3
+    solid-pressure: 1.e9
+    max-iter: 5
+
+  external:
+    x1-inner: reflecting
+    x1-outer: reflecting
+    x2-inner: custom
+    x2-outer: custom
+    x3-inner: custom
+    x3-outer: custom
+
+integration:
+  type: rk3
+  cfl: 0.45
+  implicit-scheme: 9
+  nlim: -1
+  tlim: 100.e5
+  ncycle_out: 1
+
+outputs:
+  - type: restart
+    dt: 10.E5
+  - type: netcdf
+    variables: [prim, uov]
+    dt: 1.e4
+  - type: netcdf
+    variables: [thermo]
+    dt: 1.e4
+
+forcing:
+  const-gravity:
+    grav1: -22.
+
+sedimentation:
+  radius:
+    H2O(l,p): 1.0e-10
+    NH3(s,p): 1.0e-10
+    NH4SH(s,p): 1.0e-10
+
+  density:
+    H2O(l,p): 1000.
+    NH3(s,p): 800.
+    NH4SH(s,p): 1500.
+
+  const-vsed:
+    H2O(l,p): -2.0
+    NH3(s,p): -2.0
+    NH4SH(s,p): -2.0
+
+reactions:
+  - equation: H2O => H2O(l)
+    type: nucleation
+    rate-constant: {formula: h2o_ideal}
+
+  - equation: H2O(l) => H2O(l,p)
+    type: coagulation
+    rate-constant: {A: 0.01, b: 0, Ea_R: 0.}
+
+  - equation: H2O(l,p) => H2O
+    type: evaporation
+    rate-constant: {formula: h2o_ideal, diff_c: 0.2e-4, diff_T: 0., diff_P: 0., vm: 18.e-6, diameter: 1.0e-4}
+
+  - equation: NH3 => NH3(s)
+    type: nucleation
+    rate-constant: {formula: nh3_ideal}
+
+  - equation: NH3(s) => NH3(s,p)
+    type: coagulation
+    rate-constant: {A: 0.01, b: 0, Ea_R: 2.}
+
+  - equation: NH3(s,p) => NH3
+    type: evaporation
+    rate-constant: {formula: nh3_ideal, diff_c: 0.2e-4, diff_T: 0., diff_P: 0., vm: 18.e-6, diameter: 1.0e-4}
+
+  - equation: NH3 + H2S <=> NH4SH(s)
+    type: nucleation
+    rate-constant: {formula: nh3_h2s_lewis}
+
+  - equation: NH4SH(s) => NH4SH(s,p)
+    type: coagulation
+    rate-constant: {A: 0.01, b: 0, Ea_R: 0.}
+
+  - equation: NH4SH(s,p) => NH3 + H2S
+    type: evaporation
+    rate-constant: {formula: nh3_h2s_lewis, diff_c: 0.2e-4, diff_T: 0., diff_P: 0., vm: 18.e-6, diameter: 1.0e-4}
+
+problem:
+  Ps: 100.e5
+  Ts: 600.
+  Tmin: 110.
+  xH2O: 3.e-3
+  xNH3: 3.2e-4
+  xH2S: 1.e-5

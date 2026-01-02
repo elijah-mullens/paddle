@@ -1,0 +1,92 @@
+reference-state:
+  Tref: 0.
+  Pref: 1.e5
+
+species:
+  - name: dry
+    composition: {H: 1.5, He: 0.15}
+    cv_R: 2.5
+
+geometry:
+  type: cartesian
+
+  bounds:
+    x1min: 0.
+    x1max: 300.e3
+    x2min: 0.
+    x2max: 2400.e3
+    x3min: 0.
+    x3max: 2400.e3
+
+  cells:
+    nx1: 100
+    nx2: 200
+    nx3: 200
+    nghost: 3
+
+distribute:
+  backend: gloo
+  layout: slab
+  nb2: 2
+  nb3: 2
+  verbose: false
+
+dynamics:
+  equation-of-state:
+    type: ideal-moist
+    density-floor:  1.e-10
+    pressure-floor: 1.e-10
+    tracer-floor: 1.e-10
+    limiter: true
+    max-iter: 10
+    ftol: 1.e-6
+
+  vertical-projection:
+    type: temperature
+    pressure-margin: 1.e-6
+
+  reconstruct:
+    vertical: {type: weno5, scale: true, shock: true}
+    horizontal: {type: weno5, scale: true, shock: true}
+
+  riemann-solver:
+    type: hllc
+
+boundary-condition:
+  external:
+    x1-inner: reflecting
+    x1-outer: reflecting
+    x2-inner: periodic
+    x2-outer: periodic
+    x3-inner: periodic
+    x3-outer: periodic
+
+integration:
+  type: rk3
+  cfl: 0.45
+  implicit-scheme: 1
+  nlim: -1
+  tlim: 100.e5
+  ncycle_out: 1
+
+outputs:
+  - type: restart
+    dt: 10.E5
+  - type: netcdf
+    variables: [prim]
+    dt: 1.E4
+  - type: netcdf
+    variables: [thermo]
+    dt: 1.E4
+
+forcing:
+  const-gravity:
+    grav1: -22.
+
+problem:
+  Ps: 100.e5
+  Ts: 600.
+  Tmin: 110.
+  xH2O: 3.e-3
+  xNH3: 3.2e-4
+  xH2S: 1.e-5

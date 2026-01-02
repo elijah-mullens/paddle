@@ -1,27 +1,14 @@
 import torch
-import math
-import kintera
+import time
+import numpy as np
+from snapy.distributed import get_rank, get_layout
+from snapy.coord import get_cs_face_name, cs_ab_to_lonlat
 from snapy import MeshBlockOptions, MeshBlock
-from snapy import kIDN, kIPR
+from snapy import kIDN, kIV2, kIV3
 
-
-def call_user_output(bvars):
-    hydro_w = bvars["hydro_w"]
-    out = {}
-    temp = hydro_w[kIPR] / (Rd * hydro_w[kIDN])
-    out["temp"] = temp
-    out["theta"] = temp * (p0 / hydro_w[kIPR]).pow(Rd / cp)
-    return out
-
-
-p0 = 1.0e5
-Ts = 300.0
-xc = 0.0
-xr = 4.0e3
-zc = 3.0e3
-zr = 2.0e3
-dT = -15.0
-K = 75.0
+phi = 500.0
+dphi = 10.0
+radius = 5.0e5
 
 # use cuda if available
 if torch.cuda.is_available():
@@ -30,7 +17,7 @@ else:
     device = torch.device("cpu")
 
 # set hydrodynamic options
-op = MeshBlockOptions.from_yaml("straka.yaml")
+op = MeshBlockOptions.from_yaml("shallow_splash.yaml", verbose=False)
 
 # initialize block
 block = MeshBlock(op)
@@ -38,41 +25,39 @@ block.to(device)
 
 # get handles to modules
 coord = block.module("coord")
-eos = block.module("hydro.eos")
-grav = -block.options.hydro().grav().grav1()
 
-# thermodynamics
-Rd = kintera.constants.Rgas / eos.options.weight()
-cv = eos.species_cv_ref()
-cp = cv + Rd
+# set coordinates
+r = get_rank()
+layout = get_layout()
+rx, ry, face_id = layout.loc_of(r)
+face = get_cs_face_name(face_id)
 
-# setup a meshgrid for simulation
-x3v, x2v, x1v = torch.meshgrid(
+beta, alpha, r_planet = torch.meshgrid(
     coord.buffer("x3v"), coord.buffer("x2v"), coord.buffer("x1v"), indexing="ij"
 )
+lon, lat = cs_ab_to_lonlat(face, alpha, beta)
 
 # dimensions
 nc3 = coord.buffer("x3v").shape[0]
 nc2 = coord.buffer("x2v").shape[0]
 nc1 = coord.buffer("x1v").shape[0]
-nvar = 5
+nvar = 4
 
 w = torch.zeros((nvar, nc3, nc2, nc1), device=device)
 
-L = torch.sqrt(((x2v - xc) / xr) ** 2 + ((x1v - zc) / zr) ** 2)
-temp = Ts - grav * x1v / cp
+dist = r_planet * (np.pi / 2.0 - lat)
 
-w[kIPR] = p0 * torch.pow(temp / Ts, cp / Rd)
-temp += torch.where(L <= 1, dT * (torch.cos(L * math.pi) + 1.0) / 2.0, 0)
-w[kIDN] = w[kIPR] / (Rd * temp)
+w[kIDN] = phi
+w[kIDN][torch.logical_and(dist < radius, lat > np.pi / 4.0)] += dphi
+w[kIV2] = 0.0
+w[kIV3] = 0.0
 
 block_vars = {}
 block_vars["hydro_w"] = w
 block_vars, current_time = block.initialize(block_vars)
 
-block.set_user_output_func(call_user_output)
-
 # integration
+start_time = time.time()
 block.make_outputs(block_vars, current_time)
 
 while not block.intg.stop(block.inc_cycle(), current_time):

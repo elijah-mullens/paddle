@@ -1,0 +1,89 @@
+reference-state:
+  Tref: 0.
+  Pref: 1.e5
+
+species:
+  - name: dry
+    composition: {H: 1.5, He: 0.15}
+    cv_R: 2.5
+
+geometry:
+  type: gnomonic-equiangle
+
+  bounds:
+    x1min: 69911000
+    x1max: 70211000
+    x2min_pi: -0.25
+    x2max_pi: 0.25
+    x3min_pi: -0.25
+    x3max_pi: 0.25
+
+  cells:
+    nx1: 100
+    nx2: 48
+    nx3: 48
+    nghost: 3
+
+distribute:
+  backend: gloo
+  layout: cubed-sphere
+  nb2: 1
+  nb3: 1
+  verbose: false
+
+dynamics:
+  equation-of-state:
+    type: ideal-moist
+    density-floor:  1.e-10
+    pressure-floor: 1.e-10
+    tracer-floor: 1.e-10
+    limiter: true
+    max-iter: 10
+    ftol: 1.e-6
+
+  vertical-projection:
+    type: temperature
+    pressure-margin: 1.e-6
+
+  reconstruct:
+    vertical: {type: weno5, scale: true, shock: true}
+    horizontal: {type: weno5, scale: true, shock: true}
+
+  riemann-solver:
+    type: hllc
+
+boundary-condition:
+  external:
+    x1-inner: reflecting
+    x1-outer: reflecting
+    x2-inner: custom
+    x2-outer: custom
+    x3-inner: custom
+    x3-outer: custom
+
+integration:
+  type: rk3
+  cfl: 0.45
+  implicit-scheme: 9
+  nlim: -1
+  tlim: 100.e5
+  ncycle_out: 1
+
+outputs:
+  - type: restart
+    dt: 10.E5
+  - type: netcdf
+    variables: [prim]
+    dt: 1.e4
+  - type: netcdf
+    variables: [thermo]
+    dt: 1.e4
+
+forcing:
+  const-gravity:
+    grav1: -22.
+
+problem:
+  Ps: 100.e5
+  Ts: 600.
+  Tmin: 110.
