@@ -2,7 +2,7 @@ import torch
 import math
 import time
 from snapy import MeshBlockOptions, MeshBlock
-from snapy import kIDN, kIPR, kIV2, kIV3
+from snapy import kIDN, kIV2, kIV3
 
 phi = 10.0
 uphi = 10.0
