@@ -1,4 +1,3 @@
-from importlib import resources
 from paddle import (
     setup_profile,
     write_profile,
@@ -9,17 +8,13 @@ from snapy import (
     MeshBlock,
 )
 from kintera import ThermoX
-from pathlib import Path
 
 
 def setup_saturn_profile():
-    # path = resources.files("paddle") / "data" / "saturn1d.yaml"
-    # path = Path("data") / "saturn1d.yaml"
     path = "saturn1d.yaml"
     print(f"Reading input file: {path}")
 
     op_block = MeshBlockOptions.from_yaml(str(path), verbose=False)
-    op_block.layout().master_port(29501)
     block = MeshBlock(op_block)
 
     param = {
@@ -47,13 +42,11 @@ def setup_saturn_profile():
         verbose=False,
     )
 
+    print("Found parameters:")
+    print(param)
+
     w = setup_profile(block, param, method=method, verbose=False)
-
-    thermo_y = block.module("hydro.eos.thermo")
-    thermo_x = ThermoX(thermo_y.options)
-    thermo_x.to(dtype=w.dtype, device=w.device)
-
-    write_profile("saturn_profile.txt", w, block)
+    write_profile("saturn_profile.txt", block, w)
     return w
 
 

@@ -11,8 +11,8 @@ from snapy import kIPR, kICY
 
 def write_profile(
     filename: str,
-    hydro_w: torch.Tensor,
     block: snapy.MeshBlock,
+    hydro_w: torch.Tensor,
     ref_pressure: float = 1.0e5,
     comment: Optional[str] = None,
 ) -> None:
