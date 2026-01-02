@@ -3,7 +3,7 @@ from matplotlib.patches import Polygon
 from typing import Tuple
 
 
-def normalize(v):
+def normalize(v: np.ndarray) -> np.ndarray:
     return v / np.linalg.norm(v)
 
 

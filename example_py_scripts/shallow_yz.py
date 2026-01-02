@@ -1,5 +1,5 @@
 import torch
-import math
+
 import time
 from snapy import MeshBlockOptions, MeshBlock
 from snapy import kIDN, kIV2, kIV3

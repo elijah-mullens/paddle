@@ -1,7 +1,7 @@
 import torch
-import numpy as np
+
 import yaml
-import snapy
+
 import argparse
 from snapy import MeshBlockOptions, MeshBlock, kICY
 from kintera import ThermoX, KineticsOptions, Kinetics
