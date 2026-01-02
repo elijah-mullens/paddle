@@ -23,7 +23,6 @@ block.to(device)
 
 # get handles to modules
 coord = block.module("coord")
-eos = block.module("hydro.eos")
 
 # set initial condition
 x3v, x2v, _ = torch.meshgrid(
