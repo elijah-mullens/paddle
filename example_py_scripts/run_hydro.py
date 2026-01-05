@@ -3,7 +3,7 @@ import torch
 import yaml
 
 import argparse
-from snapy import MeshBlockOptions, MeshBlock, kICY
+from snapy import MeshBlockOptions, MeshBlock, kICY, kIV1
 from kintera import ThermoX, KineticsOptions, Kinetics
 from paddle import (
     setup_profile,
@@ -18,22 +18,25 @@ def call_user_output(bvars: dict[str, torch.Tensor]):
     return out
 
 
-def run_with(infile: str):
+def run_with(infile: str, restart_file:str):
     with open(infile, "r") as f:
         config = yaml.safe_load(f)
-
-    # use cuda if available
-    if torch.cuda.is_available():
-        device = torch.device("cuda:0")
-    else:
-        device = torch.device("cpu")
 
     # set hydrodynamic options
     op = MeshBlockOptions.from_yaml(infile)
     block = MeshBlock(op)
+
+    # use cuda if available
+    if torch.cuda.is_available() and op.layout().backend() == "nccl":
+        device = torch.device(block.device())
+        print("device = ", device)
+    else:
+        device = torch.device("cpu")
+
     block.to(device)
 
     # get handles to modules
+    coord = block.module("coord")
     thermo_y = block.module("hydro.eos.thermo")
     eos = block.module("hydro.eos")
     # thermo_y.options.max_iter(100)
@@ -41,17 +44,26 @@ def run_with(infile: str):
     thermo_x = ThermoX(thermo_y.options)
     thermo_x.to(device)
 
-    param = {}
-    param["Ts"] = float(config["problem"]["Ts"])
-    param["Ps"] = float(config["problem"]["Ps"])
-    param["grav"] = -float(config["forcing"]["const-gravity"]["grav1"])
-    param["Tmin"] = float(config["problem"]["Tmin"])
-    for name in thermo_y.options.species():
-        param[f"x{name}"] = float(config["problem"].get(f"x{name}", 0.0))
-
     block_vars = {}
-    block_vars["hydro_w"] = setup_profile(block, param, method="pseudo-adiabat")
-    block_vars, current_time = block.initialize(block_vars)
+
+    if restart_file != '':
+        module = torch.jit.load(restart_file)
+        for name, data in module.named_buffers():
+            block_vars[name] = data.to(device)
+    else:
+        param = {}
+        param["Ts"] = float(config["problem"]["Ts"])
+        param["Ps"] = float(config["problem"]["Ps"])
+        param["grav"] = -float(config["forcing"]["const-gravity"]["grav1"])
+        param["Tmin"] = float(config["problem"]["Tmin"])
+        for name in thermo_y.options.species():
+            param[f"x{name}"] = float(config["problem"].get(f"x{name}", 0.0))
+
+        block_vars["hydro_w"] = setup_profile(block, param, method="pseudo-adiabat")
+
+        # add random vertical velocity
+        block_vars["hydro_w"][kIV1] += 0.1 * torch.rand_like(block_vars["hydro_w"][kIV1])
+        block_vars, current_time = block.initialize(block_vars)
 
     block.set_user_output_func(call_user_output)
 
@@ -91,10 +103,16 @@ def main():
     # parse arguments
     parser = argparse.ArgumentParser(description="Run hydrodynamic simulation.")
     parser.add_argument(
-        "-i", "--infile", type=str, required=True, help="Input YAML configuration file."
+        "-i", "--infile", type=str, 
+        required=True, help="Input YAML configuration file."
+    )
+    parser.add_argument(
+        "-r", "--restart", type=str, 
+        required=False, help="Restart from restart dump.",
+        default=""
     )
     args = parser.parse_args()
-    run_with(args.infile)
+    run_with(args.infile, args.restart)
 
 
 if __name__ == "__main__":
