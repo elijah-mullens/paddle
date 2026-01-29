@@ -1,0 +1,74 @@
+geometry:
+  type: cartesian
+  bounds:
+    x1min: 0
+    x1max: 6400.0
+    x2min: 0
+    x2max: 25600.0
+    x3min: 0
+    x3max: 25600.0
+  cells:
+    nx1: 64
+    nx2: 256
+    nx3: 1
+    nghost: 3
+dynamics:
+  equation-of-state:
+    type: ideal-gas
+    gammad: 1.4
+    weight: 0.0293
+  vertical-projection:
+    type: temperature
+    pressure-margin: 1.0e-06
+  reconstruct:
+    vertical:
+      type: weno5
+      scale: false
+      shock: false
+    horizontal:
+      type: weno5
+      scale: false
+      shock: false
+  riemann-solver:
+    type: lmars
+boundary-condition:
+  external:
+    x1-inner: reflecting
+    x1-outer: reflecting
+    x2-inner: periodic
+    x2-outer: periodic
+    x3-inner: reflecting
+    x3-outer: reflecting
+integration:
+  type: rk3
+  cfl: 0.9
+  implicit-scheme: 0
+  nlim: -1
+  tlim: 900
+  ncycle_out: 10
+forcing:
+  const-gravity:
+    grav1: -9.8
+problem:
+  p0: 100000.0
+  Ts: 300
+  xc: 0
+  xr: 4000.0
+  zc: 3000.0
+  zr: 2000.0
+  dT: -15
+  K: 75
+distribute:
+  backend: gloo
+  layout: slab
+  nb2: 1
+  nb3: 1
+  verbose: false
+outputs:
+- type: restart
+  dt: 300
+- type: netcdf
+  variables:
+  - prim
+  - uov
+  dt: 30
