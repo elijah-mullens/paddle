@@ -1,0 +1,36 @@
+1/29/2025 
+
+create a new conda environment (python 3.13)
+pip install paddle
+
+for a test, go to examples_py_scripts 
+
+pd-run 2 python straka.py 
+
+conda install -c conda-forge nco
+
+pd-combine 1 -0 main 
+
+conda install conda-forge::ncview
+
+ncview straka-main.nc
+
+In order to use ncview, need to install XQuartz
+https://www.xquartz.org/
+
+In order to use tutorial notebook:
+
+pip install PyYAML
+
+Known Errors 
+
+Error 1: 
+OMP: Error #15: Initializing libomp.dylib, but found libomp.dylib already initialized.
+
+- Not sure how to fix yet, seems to show up randomly
+
+Error 2: 
+torch.distributed.DistNetworkError
+
+- Comes up when you try to run code twice. 
+- pkill -9 straka
