@@ -1,22 +1,25 @@
 geometry:
   type: cartesian
-  bounds: {x1min: 0., x1max: 6.4e3, x2min: 0., x2max: 25.6e3, x3min: 0., x3max: 25.6e3}
-  cells: {nx1: 64, nx2: 256, nx3: 1, nghost: 3}
 
-distribute:
-  backend: gloo
-  layout: slab
-  nb2: 2
-  nb3: 1
-  verbose: false
+  bounds:
+    x1min: 0.
+    x1max: 6.4e3
+    x2min: 0.
+    x2max: 25.6e3
+    x3min: 0.
+    x3max: 25.6e3
+
+  cells:
+    nx1: 64
+    nx2: 256
+    nx3: 1
+    nghost: 3
 
 dynamics:
   equation-of-state:
     type: ideal-gas
     gammad: 1.4
     weight: 29.e-3
-    density-floor:  1.e-10
-    pressure-floor: 1.e-10
     limiter: false
 
   vertical-projection:
@@ -31,16 +34,11 @@ dynamics:
     type: lmars
 
 boundary-condition:
-  internal:
-    solid-density: 1.e3
-    solid-pressure: 1.e9
-    max-iter: 5
-
   external:
     x1-inner: reflecting
     x1-outer: reflecting
-    x2-inner: periodic
-    x2-outer: periodic
+    x2-inner: reflecting
+    x2-outer: reflecting
     x3-inner: reflecting
     x3-outer: reflecting
 
@@ -62,13 +60,3 @@ outputs:
 forcing:
   const-gravity:
     grav1: -9.8
-
-problem:
-  p0: 1.e5
-  Ts: 300.
-  xc: 0.
-  xr: 4.e3
-  zc: 3.e3
-  zr: 2.e3
-  dT: -15.
-  K: 75.
