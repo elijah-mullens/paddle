@@ -127,3 +127,23 @@ Follow the steps below to set up your development environment.
 ## Troubleshooting
 
 1. If you have Docker installed but do not have Docker Compose, remove your current Docker installation, which could be docker or docker.io, and re-install it following the guide provided in the [Develop with Docker](#develop-with-docker) section above.
+
+2. If you run out of disk space while building the image. You can relocate the default location for container images:
+Here is a simple recipe:
+
+    1. Generate config (if you don’t already have one):
+    ```
+    sudo mkdir -p /etc/containerd
+    containerd config default | sudo tee /etc/containerd/config.toml >/dev/null
+    ```
+
+    2. Edit `/etc/containerd/config.toml` and set:
+    ```
+    root = "/home/containerd"   # location where you have space
+    state = "/run/containerd"
+    ```
+
+    3. Restart
+    ```
+    sudo systemctl restart containerd
+    ```

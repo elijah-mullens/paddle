@@ -1,2 +1,6 @@
 numpy
 scipy
+netcdf4
+paddle
+ninja
+ray
