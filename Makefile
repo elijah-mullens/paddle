@@ -38,7 +38,7 @@ env: ## Generate the .env file with git configs first, then user info
 
 up: env ## Start docker containers in the background
 	@docker compose up -d
-	@docker compose exec dev bash -c '\
+	@docker compose exec captain bash -c '\
 		USER_HOME=$$(eval echo ~$$USERNAME); \
 		if [ -f /etc/git-credentials ] && [ ! -f $$USER_HOME/.git-credentials ]; then \
 			cp /etc/git-credentials $$USER_HOME/.git-credentials; \
@@ -53,9 +53,9 @@ down: env ## Stop and remove docker containers
 ps: env ## Show container status
 	@docker compose ps
 
-start: env ## Open a bash shell inside the 'dev' container as the host user, exit without error
-	@docker compose exec --user $(UID):$(GID) dev \
+start: env ## Open a bash shell inside the 'captain' container as the host user, exit without error
+	@docker compose exec --user $(UID):$(GID) captain \
 		bash -c 'git config --global --add safe.directory /paddle; exec bash'
 
-build: env ## Build (or rebuild) the 'dev' container and start it
-	@docker compose up -d --build dev
+build: env ## Build (or rebuild) the 'captain' container and start it
+	@docker compose up -d --build captain

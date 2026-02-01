@@ -1,5 +1,5 @@
 services:
-  dev:
+  captain:
     image: paddle
     build:
       context: .
@@ -19,4 +19,4 @@ services:
     tty: true
     stdin_open: true
     ports:
-      - "8888:8888"
+      - "8265:8265"
