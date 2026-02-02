@@ -8,13 +8,13 @@ networks:
 services:
   captain:
     image: paddle
-    entrypoint: ["/bin/bash", "/work/run.sh"]
+    entrypoint: ["/bin/bash"]
     user: "${USER_UID}:${USER_GID}"
     networks:
       - raynet
     # This service provides a stable DNS name "captain" on the overlay network.
     # We run a captain here and also use it as rendezvous endpoint.
-    command: /work/run.sh
+    command: ['/work/run.sh', 'captain', '0', '1', '2']
     deploy:
       restart_policy:
         condition: none
@@ -43,7 +43,7 @@ services:
     user: "${USER_UID}:${USER_GID}"
     networks:
       - raynet
-    command: /work/run.sh
+    command: ['/work/run.sh', 'captain', '1', '1', '2']
     deploy:
       restart_policy:
         condition: none

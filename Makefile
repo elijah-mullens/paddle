@@ -36,7 +36,6 @@ env: ## Generate the .env file with git configs first, then user info
 		echo "USER_GID=$$(id -g)" >> $(ENV_FILE); \
 		echo "Created $(ENV_FILE):"; cat $(ENV_FILE); \
 	fi
-	@ ln -sf docker-compose.yaml.dev docker-compose.yaml
 
 up: env ## Start docker containers in the background
 	@docker compose up -d
@@ -66,8 +65,8 @@ run: env
 	@USER_UID="$$(id -u)" USER_GID="$$(id -g)" docker stack deploy -c canoe.yaml ${JOB}
 	@docker service scale ${JOB}_captain=1 ${JOB}_crew1=1
 	@echo "${JOB} dispatched"
-	@docker stack rm ${JOB}
-	@echo "${JOB} returned"
+	#@docker stack rm ${JOB}
+	#@echo "${JOB} returned"
 
 return:
 	@docker stack rm ${JOB}
