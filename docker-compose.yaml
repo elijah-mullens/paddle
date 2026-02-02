@@ -1,5 +1,5 @@
 services:
-  captain:
+  dev:
     image: paddle
     build:
       context: .

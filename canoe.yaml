@@ -1,0 +1,67 @@
+version: "3.8"
+
+networks:
+  raynet:
+    driver: overlay
+    attachable: true
+
+services:
+  captain:
+    image: paddle
+    entrypoint: ["/bin/bash", "/work/run.sh"]
+    user: "${USER_UID}:${USER_GID}"
+    networks:
+      - raynet
+    # This service provides a stable DNS name "captain" on the overlay network.
+    # We run a captain here and also use it as rendezvous endpoint.
+    command: /work/run.sh
+    deploy:
+      restart_policy:
+        condition: none
+      resources:
+        reservations:
+          generic_resources:
+            - discrete_resource_spec:
+                kind: gpu
+                value: 1
+      replicas: 0
+      placement:
+        constraints:
+          - node.labels.role == captain
+    environment:
+      - USERNAME=${USER}
+      - USER_UID=${USER_UID}
+      - USER_GID=${USER_GID}
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - .:/work
+    working_dir: /work
+
+  crew1:
+    image: paddle
+    entrypoint: ["/bin/bash"]
+    user: "${USER_UID}:${USER_GID}"
+    networks:
+      - raynet
+    command: /work/run.sh
+    deploy:
+      restart_policy:
+        condition: none
+      resources:
+        reservations:
+          generic_resources:
+            - discrete_resource_spec:
+                kind: gpu
+                value: 1
+      replicas: 0
+      placement:
+        constraints:
+          - node.labels.role == crew
+    environment:
+      - USERNAME=${USER}
+      - USER_UID=${USER_UID}
+      - USER_GID=${USER_GID}
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - .:/work
+    working_dir: /work

@@ -3,8 +3,9 @@ UID := $$(id -u)
 GID := $$(id -g)
 GITCONFIG := $${HOME}/.gitconfig
 GITCREDENTIALS := $${HOME}/.git-credentials
+JOB := canoe$(date +%Y%m%d_%H%M%S)
 
-.PHONY: help env up down ps start build
+.PHONY: help env up down ps start build canoe return log crew1
 
 # Show help for each target
 help: ## Show this help message
@@ -35,10 +36,11 @@ env: ## Generate the .env file with git configs first, then user info
 		echo "USER_GID=$$(id -g)" >> $(ENV_FILE); \
 		echo "Created $(ENV_FILE):"; cat $(ENV_FILE); \
 	fi
+	@ ln -sf docker-compose.yaml.dev docker-compose.yaml
 
 up: env ## Start docker containers in the background
 	@docker compose up -d
-	@docker compose exec captain bash -c '\
+	@docker compose exec dev bash -c '\
 		USER_HOME=$$(eval echo ~$$USERNAME); \
 		if [ -f /etc/git-credentials ] && [ ! -f $$USER_HOME/.git-credentials ]; then \
 			cp /etc/git-credentials $$USER_HOME/.git-credentials; \
@@ -53,9 +55,25 @@ down: env ## Stop and remove docker containers
 ps: env ## Show container status
 	@docker compose ps
 
-start: env ## Open a bash shell inside the 'captain' container as the host user, exit without error
-	@docker compose exec --user $(UID):$(GID) captain \
-		bash -c 'git config --global --add safe.directory /paddle; exec bash'
+start: env ## Open a bash shell inside the 'dev' container as the host user, exit without error
+	@docker compose exec --user $(UID):$(GID) dev \
+		bash -c 'git config --global --add safe.directory /paddle; exec bash; source /opt/venv/bin/activate'
 
-build: env ## Build (or rebuild) the 'captain' container and start it
-	@docker compose up -d --build captain
+build: env ## Build (or rebuild) the 'dev' container and start it
+	@docker compose up -d --build dev
+
+run: env
+	@USER_UID="$$(id -u)" USER_GID="$$(id -g)" docker stack deploy -c canoe.yaml ${JOB}
+	@docker service scale ${JOB}_captain=1 ${JOB}_crew1=1
+	@echo "${JOB} dispatched"
+	@docker stack rm ${JOB}
+	@echo "${JOB} returned"
+
+return:
+	@docker stack rm ${JOB}
+
+log:
+	docker service logs -f canoe_captain
+
+crew1:
+	docker service logs -f canoe_crew1
