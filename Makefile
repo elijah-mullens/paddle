@@ -76,10 +76,19 @@ status: ## Show the job status
 	docker service ps ${JOB}_captain
 
 mint: ## Mint the current environment
+	# Remove any git credential files from the dev container before snapshotting
+	docker exec paddle-dev-1 bash -lc 'rm -f /etc/git-credentials /root/.git-credentials /home/*/.git-credentials 2>/dev/null || true'
 	docker commit paddle-dev-1 ubuntu22.04-cuda12.9-py3.10-canoe:latest
 	docker tag ubuntu22.04-cuda12.9-py3.10-canoe:latest docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
 
 upload: ## Upload the minted image to docker hub
+	# Refuse to push if the image still contains git credential files
+	docker run --rm docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING} sh -c '\
+		if [ -f /etc/git-credentials ] || [ -f /root/.git-credentials ] || ls /home/*/.git-credentials >/dev/null 2>&1; then \
+			echo "Refusing to push image: git credential files detected inside the image." >&2; \
+			exit 1; \
+		fi \
+	'
 	docker push docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
 
 node: ## Show nodes in cluster
