@@ -70,10 +70,10 @@ finish: ## Clean up the deployed job
 	@docker stack rm ${JOB}
 
 log: ## Show the job log file
-	docker service logs canoe_captain
+	docker service logs ${JOB}_captain
 
 status: ## Show the job status
-	docker service ps canoe_captain
+	docker service ps ${JOB}_captain
 
 mint: ## Mint the current environment
 	docker commit paddle-dev-1 ubuntu22.04-cuda12.9-py3.10-canoe:latest
