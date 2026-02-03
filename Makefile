@@ -6,7 +6,7 @@ GITCREDENTIALS := $${HOME}/.git-credentials
 DATE_STRING := $(shell date "+%Y-%m-%d")
 JOB := canoe$(date +%Y%m%d_%H%M%S)
 
-.PHONY: help env up down ps start build deploy finish log crew1
+.PHONY: help env up down ps start build deploy finish log status mint upload crew1
 
 # Show help for each target
 help: ## Show this help message
@@ -64,16 +64,19 @@ build: env ## Build (or rebuild) the 'dev' container and start it
 
 deploy: env ## Deploy a program to cluster
 	@USER_UID="$$(id -u)" USER_GID="$$(id -g)" docker stack deploy -c deploy.yaml ${JOB}
-	@docker service scale ${JOB}_captain=1 ${JOB}_crew1=1
-	@echo "${JOB} dispatched"
-	#@docker stack rm ${JOB}
-	#@echo "${JOB} finished"
+	@echo -e "\033[32m[OK]\033[0m ${JOB} deployed"
 
-finish:
+finish: ## Clean up the deployed job
 	@docker stack rm ${JOB}
 
-log:
-	docker service logs -f canoe_captain
+log: ## show the job log file
+	docker service logs canoe_captain
+
+status: ## show the job status
+	docker service ps canoe_captain
+
+restart: ## restart a job
+	docker service scale ${JOB}_captain=1 ${JOB}_crew1=1
 
 crew1:
 	docker service logs -f canoe_crew1

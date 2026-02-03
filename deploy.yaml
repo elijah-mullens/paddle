@@ -23,7 +23,7 @@ services:
             - discrete_resource_spec:
                 kind: gpu
                 value: 1
-      replicas: 0
+      replicas: 1
       placement:
         constraints:
           - node.labels.role == captain
@@ -57,7 +57,7 @@ services:
             - discrete_resource_spec:
                 kind: gpu
                 value: 1
-      replicas: 0
+      replicas: 1
       placement:
         constraints:
           - node.labels.role == crew
