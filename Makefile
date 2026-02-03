@@ -62,24 +62,18 @@ start: env ## Open a bash shell inside the 'dev' container as the host user, exi
 build: env ## Build (or rebuild) the 'dev' container and start it
 	@docker compose up -d --build dev
 
-deploy: env ## Deploy a program to cluster
+deploy: env ## Deploy a multi-node job to cluster
 	@USER_UID="$$(id -u)" USER_GID="$$(id -g)" docker stack deploy -c deploy.yaml ${JOB}
 	@echo -e "\033[32m[OK]\033[0m ${JOB} deployed"
 
 finish: ## Clean up the deployed job
 	@docker stack rm ${JOB}
 
-log: ## show the job log file
+log: ## Show the job log file
 	docker service logs canoe_captain
 
-status: ## show the job status
+status: ## Show the job status
 	docker service ps canoe_captain
-
-restart: ## restart a job
-	docker service scale ${JOB}_captain=1 ${JOB}_crew1=1
-
-crew1:
-	docker service logs -f canoe_crew1
 
 mint: ## Mint the current environment
 	docker commit paddle-dev-1 ubuntu22.04-cuda12.9-py3.10-canoe:latest
@@ -87,3 +81,19 @@ mint: ## Mint the current environment
 
 upload: ## Upload the minted image to docker hub
 	docker push docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
+
+resource: ## Print out cluster resource
+	@printf "%-35s %-10s %-15s %-10s\n" "NODE" "CPUs" "MEMORY (GB)" "GPUs"
+	@printf "%-35s %-10s %-15s %-10s\n" "----" "----" "-----------" "----"
+	@for node in $$(docker node ls --format "{{.Hostname}}"); do \
+		RESOURCES=$$(docker node inspect $$node --format ' \
+			{{.Description.Resources.NanoCPUs}} \
+			{{.Description.Resources.MemoryBytes}} \
+			{{if .Description.Resources.GenericResources}}{{range .Description.Resources.GenericResources}}{{if .NamedResourceSpec}}{{.NamedResourceSpec.Kind}} {{else if .DiscreteResourceSpec}}{{.DiscreteResourceSpec.Kind}} {{end}}{{end}}{{else}}0{{end}}'); \
+		\
+		CPUS=$$(echo $$RESOURCES | awk '{print $$1 / 1000000000}'); \
+		MEM=$$(echo $$RESOURCES | awk '{print $$2 / 1024 / 1024 / 1024}'); \
+		GPU_COUNT=$$(echo $$RESOURCES | grep -o "gpu" | wc -l); \
+		\
+		printf "%-35s %-10s %-15.2f %-10s\n" $$node $$CPUS $$MEM $$GPU_COUNT; \
+	done
