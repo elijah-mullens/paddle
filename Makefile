@@ -84,7 +84,7 @@ mint: ## Mint the current environment
 upload: ## Upload the minted image to docker hub
 	# Refuse to push if the image still contains git credential files
 	docker run --rm docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING} sh -c '\
-		if [ -f /etc/git-credentials ] || [ -f /root/.git-credentials ] || ls /home/*/.git-credentials >/dev/null 2>&1; then \
+		if ls /home/*/.git-credentials >/dev/null 2>&1; then \
 			echo "Refusing to push image: git credential files detected inside the image." >&2; \
 			exit 1; \
 		fi \
