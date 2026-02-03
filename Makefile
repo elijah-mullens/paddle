@@ -3,9 +3,10 @@ UID := $$(id -u)
 GID := $$(id -g)
 GITCONFIG := $${HOME}/.gitconfig
 GITCREDENTIALS := $${HOME}/.git-credentials
+DATE_STRING := $(shell date "+%Y-%m-%d")
 JOB := canoe$(date +%Y%m%d_%H%M%S)
 
-.PHONY: help env up down ps start build canoe return log crew1
+.PHONY: help env up down ps start build deploy finish log crew1
 
 # Show help for each target
 help: ## Show this help message
@@ -61,14 +62,14 @@ start: env ## Open a bash shell inside the 'dev' container as the host user, exi
 build: env ## Build (or rebuild) the 'dev' container and start it
 	@docker compose up -d --build dev
 
-run: env
-	@USER_UID="$$(id -u)" USER_GID="$$(id -g)" docker stack deploy -c canoe.yaml ${JOB}
+deploy: env ## Deploy a program to cluster
+	@USER_UID="$$(id -u)" USER_GID="$$(id -g)" docker stack deploy -c deploy.yaml ${JOB}
 	@docker service scale ${JOB}_captain=1 ${JOB}_crew1=1
 	@echo "${JOB} dispatched"
 	#@docker stack rm ${JOB}
-	#@echo "${JOB} returned"
+	#@echo "${JOB} finished"
 
-return:
+finish:
 	@docker stack rm ${JOB}
 
 log:
@@ -76,3 +77,10 @@ log:
 
 crew1:
 	docker service logs -f canoe_crew1
+
+mint: ## Mint the current environment
+	docker commit paddle-dev-1 ubuntu22.04-cuda12.9-py3.10-canoe:latest
+	docker tag ubuntu22.04-cuda12.9-py3.10-canoe:latest docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
+
+upload: ## Upload the minted image to docker hub
+	docker push docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
