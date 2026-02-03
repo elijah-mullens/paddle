@@ -57,7 +57,7 @@ ps: env ## Show container status
 
 start: env ## Open a bash shell inside the 'dev' container as the host user, exit without error
 	@docker compose exec --user $(UID):$(GID) dev \
-		bash -c 'git config --global --add safe.directory /paddle; exec bash; source /opt/venv/bin/activate'
+		bash -c 'git config --global --add safe.directory /paddle; source /opt/venv/bin/activate; exec bash'
 
 build: env ## Build (or rebuild) the 'dev' container and start it
 	@docker compose up -d --build dev
