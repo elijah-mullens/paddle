@@ -32,9 +32,9 @@ services:
       - USER_UID=${USER_UID}
       - USER_GID=${USER_GID}
       - NVIDIA_VISIBLE_DEVICES=all
-      - NCCL_DEBUG=INFO
+      #- NCCL_DEBUG=INFO
       - NCCL_SOCKET_IFNAME=eth0
-      - NCCL_ASYNC_ERROR_HANDLING=1
+      #- NCCL_ASYNC_ERROR_HANDLING=1
     volumes:
       - .:/work
       #- nfs:/data
@@ -66,9 +66,9 @@ services:
       - USER_UID=${USER_UID}
       - USER_GID=${USER_GID}
       - NVIDIA_VISIBLE_DEVICES=all
-      - NCCL_DEBUG=INFO
+      #- NCCL_DEBUG=INFO
       - NCCL_SOCKET_IFNAME=eth0
-      - NCCL_ASYNC_ERROR_HANDLING=1
+      #- NCCL_ASYNC_ERROR_HANDLING=1
     volumes:
       - .:/work
       #- nfs:/data
