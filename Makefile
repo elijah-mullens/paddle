@@ -6,7 +6,7 @@ GITCREDENTIALS := $${HOME}/.git-credentials
 DATE_STRING := $(shell date "+%Y-%m-%d")
 JOB := canoe$(date +%Y%m%d_%H%M%S)
 
-.PHONY: help env up down ps start build deploy finish log status mint upload crew1
+.PHONY: help env up down ps start build deploy finish log status mint upload node resource
 
 # Show help for each target
 help: ## Show this help message
@@ -81,6 +81,9 @@ mint: ## Mint the current environment
 
 upload: ## Upload the minted image to docker hub
 	docker push docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
+
+node: ## Show nodes in cluster
+	docker node ls
 
 resource: ## Print out cluster resource
 	@printf "%-35s %-10s %-15s %-10s\n" "NODE" "CPUs" "MEMORY (GB)" "GPUs"
