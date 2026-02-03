@@ -1,6 +1,7 @@
-numpy
-scipy
 netcdf4
-paddle
 ninja
+numpy
+paddle
+pre-commit
 ray
+scipy
