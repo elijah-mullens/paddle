@@ -1,0 +1,19 @@
+services:
+  dev:
+    image: paddle
+    build:
+      dockerfile: docker/Dockerfile.cuda
+      args:
+        CUDA_VER: "12.9.1"
+    gpus: all
+    volumes:
+      - /home/${USER}/Model:/Model
+      - dart_nfs:/data
+
+volumes:
+  dart_nfs:
+    driver: local
+    driver_opts:
+      type: "nfs"
+      o: "addr=coe-chengcli.turbo.storage.umich.edu,nfsvers=3,rw"
+      device: ":/coe-chengcli"

@@ -3,8 +3,10 @@ UID := $$(id -u)
 GID := $$(id -g)
 GITCONFIG := $${HOME}/.gitconfig
 GITCREDENTIALS := $${HOME}/.git-credentials
+DATE_STRING := $(shell date "+%Y-%m-%d")
+JOB := canoe$(date +%Y%m%d_%H%M%S)
 
-.PHONY: help env up down ps start build
+.PHONY: help env up down ps start build deploy finish log status mint upload node resource
 
 # Show help for each target
 help: ## Show this help message
@@ -55,7 +57,55 @@ ps: env ## Show container status
 
 start: env ## Open a bash shell inside the 'dev' container as the host user, exit without error
 	@docker compose exec --user $(UID):$(GID) dev \
-		bash -c 'git config --global --add safe.directory /paddle; exec bash'
+		bash -c 'git config --global --add safe.directory /paddle; source /opt/venv/bin/activate; exec bash'
 
 build: env ## Build (or rebuild) the 'dev' container and start it
 	@docker compose up -d --build dev
+
+deploy: env ## Deploy a multi-node job to cluster
+	@USER_UID="$$(id -u)" USER_GID="$$(id -g)" docker stack deploy -c deploy.yaml ${JOB}
+	@echo -e "\033[32m[OK]\033[0m ${JOB} deployed"
+
+finish: ## Clean up the deployed job
+	@docker stack rm ${JOB}
+
+log: ## Show the job log file
+	docker service logs ${JOB}_captain
+
+status: ## Show the job status
+	docker service ps ${JOB}_captain
+
+mint: ## Mint the current environment
+	# Remove any git credential files from the dev container before snapshotting
+	docker exec paddle-dev-1 bash -lc 'rm -f /etc/git-credentials /root/.git-credentials /home/*/.git-credentials 2>/dev/null || true'
+	docker commit paddle-dev-1 ubuntu22.04-cuda12.9-py3.10-canoe:latest
+	docker tag ubuntu22.04-cuda12.9-py3.10-canoe:latest docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
+
+upload: ## Upload the minted image to docker hub
+	# Refuse to push if the image still contains git credential files
+	docker run --rm docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING} sh -c '\
+		if ls /home/*/.git-credentials >/dev/null 2>&1; then \
+			echo "Refusing to push image: git credential files detected inside the image." >&2; \
+			exit 1; \
+		fi \
+	'
+	docker push docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
+
+node: ## Show nodes in cluster
+	docker node ls
+
+resource: ## Print out cluster resource
+	@printf "%-35s %-10s %-15s %-10s\n" "NODE" "CPUs" "MEMORY (GB)" "GPUs"
+	@printf "%-35s %-10s %-15s %-10s\n" "----" "----" "-----------" "----"
+	@for node in $$(docker node ls --format "{{.Hostname}}"); do \
+		RESOURCES=$$(docker node inspect $$node --format ' \
+			{{.Description.Resources.NanoCPUs}} \
+			{{.Description.Resources.MemoryBytes}} \
+			{{if .Description.Resources.GenericResources}}{{range .Description.Resources.GenericResources}}{{if .NamedResourceSpec}}{{.NamedResourceSpec.Kind}} {{else if .DiscreteResourceSpec}}{{.DiscreteResourceSpec.Kind}} {{end}}{{end}}{{else}}0{{end}}'); \
+		\
+		CPUS=$$(echo $$RESOURCES | awk '{print $$1 / 1000000000}'); \
+		MEM=$$(echo $$RESOURCES | awk '{print $$2 / 1024 / 1024 / 1024}'); \
+		GPU_COUNT=$$(echo $$RESOURCES | grep -o "gpu" | wc -l); \
+		\
+		printf "%-35s %-10s %-15.2f %-10s\n" $$node $$CPUS $$MEM $$GPU_COUNT; \
+	done
