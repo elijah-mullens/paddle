@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1.7
 ARG CUDA_VER=12.9.1
 ARG UBUNTU_VER=22.04
+ARG PYHARP_VER=1.8.8
+ARG KINTERA_VER=1.2.10
+ARG SNAPY_VER=1.2.6
 
 ############################
 # Base CUDA toolchain
@@ -122,9 +125,17 @@ ENV TORCH_CUDA_ARCH_LIST="8.6;8.9;9.0+PTX"  \
 ############################
 # Clone Pyharp/Kintera/Snapy
 ############################
-RUN git clone https://github.com/chengcli/pyharp/
-RUN git clone https://github.com/chengcli/kintera/
-RUN git clone https://github.com/chengcli/snapy/
+RUN git clone https://github.com/chengcli/pyharp/ \
+ && cd pyharp \
+ && git checkout v${PYHARP_VER}
+
+RUN git clone https://github.com/chengcli/kintera/ \
+ && cd kintera \
+ && git checkout v${KINTERA_VER}
+
+RUN git clone https://github.com/chengcli/snapy/ \
+ && cd snapy \
+ && git checkout v${SNAPY_VER}
 
 ############################
 # Install pyharp
