@@ -119,6 +119,54 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 ENV TORCH_CUDA_ARCH_LIST="8.6;8.9;9.0+PTX"  \
     CUDA_CACHE_MAXSIZE=2147483647
 
+############################
+# Clone Pyharp/Kintera/Snapy
+############################
+RUN git clone https://github.com/chengcli/pyharp/
+RUN git clone https://github.com/chengcli/kintera/
+RUN git clone https://github.com/chengcli/snapy/
+
+############################
+# Install pyharp
+############################
+WORKDIR /workspace/pyharp
+
+# ---- Configure + build ----
+RUN cmake -B /pyharp/build -DCUDA=ON \
+ && cmake --build /src/build --config Release --parallel 4
+
+# ---- Install Python package ----
+RUN python -m pip install .
+
+############################
+# Install Kintera
+############################
+WORKDIR /workspace/kintera
+
+# ---- Configure + build ----
+RUN cmake -B /pyharp/build -DCUDA=ON \
+ && cmake --build /src/build --config Release --parallel 4
+
+# ---- Install Python package ----
+RUN python -m pip install .
+
+############################
+# Install Snapy
+############################
+WORKDIR /workspace/snapy
+
+# ---- Configure + build ----
+RUN cmake -B /pyharp/build -DCUDA=ON \
+ && cmake --build /src/build --config Release --parallel 4
+
+# ---- Install Python package ----
+RUN python -m pip install .
+
+############################
+# Final setup
+############################
+WORKDIR /workspace/
+
 # Put your entrypoint in place
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh

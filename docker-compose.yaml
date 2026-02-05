@@ -12,10 +12,10 @@ services:
       - USER_UID=${USER_UID}
       - USER_GID=${USER_GID}
     volumes:
-      - .:/paddle
+      - ..:/work
       - ${GITCONFIG}:/etc/gitconfig
       - ${GITCREDENTIALS}:/etc/git-credentials
-    working_dir: /paddle
+    working_dir: /work
     tty: true
     stdin_open: true
     ports:
