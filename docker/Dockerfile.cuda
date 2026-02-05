@@ -1,14 +1,15 @@
 # syntax=docker/dockerfile:1.7
 ARG CUDA_VER=12.9.1
 ARG UBUNTU_VER=22.04
-ARG PYHARP_VER=1.8.8
-ARG KINTERA_VER=1.2.10
-ARG SNAPY_VER=1.2.6
 
 ############################
 # Base CUDA toolchain
 ############################
 FROM nvidia/cuda:${CUDA_VER}-devel-ubuntu${UBUNTU_VER} AS base
+
+ARG PYHARP_VER=1.8.8
+ARG KINTERA_VER=1.2.10
+ARG SNAPY_VER=1.2.7
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC
@@ -143,8 +144,8 @@ RUN git clone https://github.com/chengcli/snapy/ \
 WORKDIR /workspace/pyharp
 
 # ---- Configure + build ----
-RUN cmake -B /pyharp/build -DCUDA=ON \
- && cmake --build /src/build --config Release --parallel 4
+RUN cmake -B build -DCUDA=ON \
+ && cmake --build build --config Release --parallel 4
 
 # ---- Install Python package ----
 RUN python -m pip install .
@@ -155,8 +156,8 @@ RUN python -m pip install .
 WORKDIR /workspace/kintera
 
 # ---- Configure + build ----
-RUN cmake -B /pyharp/build -DCUDA=ON \
- && cmake --build /src/build --config Release --parallel 4
+RUN cmake -B build -DCUDA=ON \
+ && cmake --build build --config Release --parallel 4
 
 # ---- Install Python package ----
 RUN python -m pip install .
@@ -167,8 +168,8 @@ RUN python -m pip install .
 WORKDIR /workspace/snapy
 
 # ---- Configure + build ----
-RUN cmake -B /pyharp/build -DCUDA=ON \
- && cmake --build /src/build --config Release --parallel 4
+RUN cmake -B build -DCUDA=ON \
+ && cmake --build build --config Release --parallel 4
 
 # ---- Install Python package ----
 RUN python -m pip install .
