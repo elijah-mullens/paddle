@@ -7,7 +7,7 @@ networks:
 
 services:
   captain:
-    image: luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:2026-02-03
+    image: luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:2026-02-05
     entrypoint: ["/bin/bash"]
     user: "${USER_UID}:${USER_GID}"
     networks:
@@ -32,16 +32,14 @@ services:
       - USER_UID=${USER_UID}
       - USER_GID=${USER_GID}
       - NVIDIA_VISIBLE_DEVICES=all
-      #- NCCL_DEBUG=INFO
       - NCCL_SOCKET_IFNAME=eth0
-      #- NCCL_ASYNC_ERROR_HANDLING=1
     volumes:
       - .:/work
       #- nfs:/data
     working_dir: /work
 
   crew1:
-    image: luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:2026-02-03
+    image: luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:2026-02-05
     entrypoint: ["/bin/bash"]
     user: "${USER_UID}:${USER_GID}"
     networks:
@@ -66,9 +64,7 @@ services:
       - USER_UID=${USER_UID}
       - USER_GID=${USER_GID}
       - NVIDIA_VISIBLE_DEVICES=all
-      #- NCCL_DEBUG=INFO
       - NCCL_SOCKET_IFNAME=eth0
-      #- NCCL_ASYNC_ERROR_HANDLING=1
     volumes:
       - .:/work
       #- nfs:/data
