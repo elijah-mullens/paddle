@@ -12,9 +12,6 @@ MASTER_ADDR=$1 # \
 NODE_RANK=$2 # \
 PROC_PER_NODE=$3 # \
 NODES=$4 # \
-#WORLD_SIZE=$4 # \
-#CUDA_VISIBLE_DEVICES="0,1" \
-#python /work/straka.py
 
 torchrun \
     --nnodes=$NODES \
