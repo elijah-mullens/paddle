@@ -1,0 +1,13 @@
+type: cartesian
+bounds:
+  x1min: 0
+  x1max: 6400.0
+  x2min: 0
+  x2max: 25600.0
+  x3min: 0
+  x3max: 25600.0
+cells:
+  nx1: 64
+  nx2: 256
+  nx3: 1
+  nghost: 3
