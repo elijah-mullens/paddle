@@ -10,18 +10,26 @@ def call_user_output(bvars):
     out = {}
     temp = hydro_w[kIPR] / (Rd * hydro_w[kIDN])
     out["temp"] = temp
-    out["theta"] = temp * (p0 / hydro_w[kIPR]).pow(Rd / cp)
+    out["theta"] = temp * (Ps / hydro_w[kIPR]).pow(Rd / cp)
     return out
 
 
-p0 = 1.0e5
+Ps = 1.0e5
 Ts = 300.0
 xc = 0.0
 xr = 4.0e3
 zc = 3.0e3
 zr = 2.0e3
 dT = -15.0
-K = 75.0
+
+# For the bigger bubble, discussed in Part 5 
+# Ps = 1.0e5
+# Ts = 300
+# xc = 13e3 
+# xr = 6e3
+# zc = 4e3
+# zr = 3e3
+# dT = -20
 
 # use cuda if available
 if torch.cuda.is_available():
@@ -62,7 +70,7 @@ w = torch.zeros((nvar, nc3, nc2, nc1), device=device)
 L = torch.sqrt(((x2v - xc) / xr) ** 2 + ((x1v - zc) / zr) ** 2)
 temp = Ts - grav * x1v / cp
 
-w[kIPR] = p0 * torch.pow(temp / Ts, cp / Rd)
+w[kIPR] = Ps * torch.pow(temp / Ts, cp / Rd)
 temp += torch.where(L <= 1, dT * (torch.cos(L * math.pi) + 1.0) / 2.0, 0)
 w[kIDN] = w[kIPR] / (Rd * temp)
 
