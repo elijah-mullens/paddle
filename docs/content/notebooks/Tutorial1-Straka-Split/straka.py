@@ -22,10 +22,10 @@ zc = 3.0e3
 zr = 2.0e3
 dT = -15.0
 
-# For the bigger bubble, discussed in Part 5 
+# For the bigger bubble, discussed in Part 5
 # Ps = 1.0e5
 # Ts = 300
-# xc = 13e3 
+# xc = 13e3
 # xr = 6e3
 # zc = 4e3
 # zr = 3e3

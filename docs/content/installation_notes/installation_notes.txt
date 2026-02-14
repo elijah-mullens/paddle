@@ -35,6 +35,6 @@ torch.distributed.DistNetworkError
 - Comes up when you try to run code twice.
 - pkill -9 straka
 
-For actual upload will need 
+For actual upload will need
 Installation instructions
 Docker Instructions
