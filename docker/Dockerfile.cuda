@@ -7,6 +7,10 @@ ARG UBUNTU_VER=22.04
 ############################
 FROM nvidia/cuda:${CUDA_VER}-devel-ubuntu${UBUNTU_VER} AS base
 
+ARG PYHARP_VER=1.8.8
+ARG KINTERA_VER=1.3.1
+ARG SNAPY_VER=1.3.1
+
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC
 
@@ -118,6 +122,71 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # (Optional) CUDA env defaults for many toolchains
 ENV TORCH_CUDA_ARCH_LIST="8.6;8.9;9.0+PTX"  \
     CUDA_CACHE_MAXSIZE=2147483647
+
+############################
+# Install pyharp
+############################
+WORKDIR /workspace
+ARG PYHARP_VER
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/root/.cache/ccache \
+    set -eu pipefail; \
+    if [ ! -d "pyharp/.git" ]; then \
+      rm -rf pyharp; \
+      git clone --filter=blob:none --depth 1 https://github.com/chengcli/pyharp/ pyharp; \
+    fi; \
+    cd pyharp; \
+    git fetch --force --tags --prune --depth 1; \
+    git checkout -f "v${PYHARP_VER}"; \
+    cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
+    cmake --build build --parallel "$(nproc)"; \
+    python -m pip install --no-cache-dir .
+
+############################
+# Install kintera
+############################
+WORKDIR /workspace
+ARG KINTERA_VER
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/root/.cache/ccache \
+    set -eu pipefail; \
+    if [ ! -d "kintera/.git" ]; then \
+      rm -rf kintera; \
+      git clone --filter=blob:none --depth 1 https://github.com/chengcli/kintera/ kintera; \
+    fi; \
+    cd kintera; \
+    git fetch --force --tags --prune --depth 1; \
+    git checkout -f "v${KINTERA_VER}"; \
+    cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
+    cmake --build build --parallel "$(nproc)"; \
+    python -m pip install --no-cache-dir .
+
+############################
+# Install snapy
+############################
+WORKDIR /workspace
+ARG SNAPY_VER
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/root/.cache/ccache \
+    set -eu pipefail; \
+    if [ ! -d "snapy/.git" ]; then \
+      rm -rf snapy; \
+      git clone --filter=blob:none --depth 1 https://github.com/chengcli/snapy/ snapy; \
+    fi; \
+    cd snapy; \
+    git fetch --force --tags --prune --depth 1; \
+    git checkout -f "v${SNAPY_VER}"; \
+    cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
+    cmake --build build --parallel "$(nproc)"; \
+    python -m pip install --no-cache-dir .
+
+############################
+# Final setup
+############################
+WORKDIR /workspace
 
 # Put your entrypoint in place
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh

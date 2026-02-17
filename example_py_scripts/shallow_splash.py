@@ -10,17 +10,17 @@ phi = 500.0
 dphi = 10.0
 radius = 5.0e5
 
+# set hydrodynamic options
+op = MeshBlockOptions.from_yaml("shallow_splash.yaml", verbose=False)
+op.output_dir("/data")
+block = MeshBlock(op)
+
 # use cuda if available
-if torch.cuda.is_available():
-    device = torch.device("cuda:0")
+if torch.cuda.is_available() and op.layout().backend() == "nccl":
+    device = torch.device(block.device())
 else:
     device = torch.device("cpu")
 
-# set hydrodynamic options
-op = MeshBlockOptions.from_yaml("shallow_splash.yaml", verbose=False)
-
-# initialize block
-block = MeshBlock(op)
 block.to(device)
 
 # get handles to modules
@@ -28,6 +28,7 @@ coord = block.module("coord")
 
 # set coordinates
 r = get_rank()
+
 layout = get_layout()
 rx, ry, face_id = layout.loc_of(r)
 face = get_cs_face_name(face_id)

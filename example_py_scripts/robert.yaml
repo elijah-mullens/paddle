@@ -1,17 +1,3 @@
-reference-state:
-  Tref: 0.
-  Pref: 1.e5
-
-species:
-  - name: dry
-    composition: {O: 0.42, N: 1.56, Ar: 0.01}
-    cv_R: 2.5
-
-geometry:
-  type: cartesian
-  bounds: {x1min: 0., x1max: 1.5e3, x2min: 0., x2max: 1.e3, x3min: -0.5, x3max: 0.5}
-  cells: {nx1: 300, nx2: 200, nx3: 1, nghost: 3}
-
 distribute:
   backend: gloo
   layout: slab
@@ -19,13 +5,28 @@ distribute:
   nb3: 1
   verbose: false
 
+geometry:
+  type: cartesian
+
+  bounds:
+    x1min: 0.
+    x1max: 1.5e3
+    x2min: 0.
+    x2max: 1.e3
+    x3min: -0.5
+    x3max: 0.5
+
+  cells:
+    nx1: 300
+    nx2: 200
+    nx3: 1
+    nghost: 3
+
 dynamics:
   equation-of-state:
     type: ideal-gas
     gammad: 1.4
     weight: 29.e-3
-    density-floor:  1.e-10
-    pressure-floor: 1.e-10
     limiter: false
 
   vertical-projection:
@@ -40,11 +41,6 @@ dynamics:
     type: lmars
 
 boundary-condition:
-  internal:
-    solid-density: 1.e3
-    solid-pressure: 1.9
-    max-iter: 5
-
   external:
     x1-inner: reflecting
     x1-outer: reflecting
@@ -61,13 +57,13 @@ integration:
   tlim: 1080
   ncycle_out: 10
 
-forcing:
-  const-gravity:
-    grav1: -9.8
-
 outputs:
   - type: restart
     dt: 300.
   - type: netcdf
     variables: [prim, uov]
     dt: 30.
+
+forcing:
+  const-gravity:
+    grav1: -9.8

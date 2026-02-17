@@ -23,18 +23,18 @@ zr = 2.0e3
 dT = -15.0
 K = 75.0
 
+# set hydrodynamic options
+op = MeshBlockOptions.from_yaml("straka.yaml")
+block = MeshBlock(op)
+
 # use cuda if available
-if torch.cuda.is_available():
-    device = torch.device("cuda:0")
+if torch.cuda.is_available() and op.layout().backend() == "nccl":
+    device = torch.device(block.device())
 else:
     device = torch.device("cpu")
 
-# set hydrodynamic options
-op = MeshBlockOptions.from_yaml("straka.yaml")
-
-# initialize block
-block = MeshBlock(op)
 block.to(device)
+block.set_user_output_func(call_user_output)
 
 # get handles to modules
 coord = block.module("coord")
@@ -69,8 +69,6 @@ w[kIDN] = w[kIPR] / (Rd * temp)
 block_vars = {}
 block_vars["hydro_w"] = w
 block_vars, current_time = block.initialize(block_vars)
-
-block.set_user_output_func(call_user_output)
 
 # integration
 block.make_outputs(block_vars, current_time)

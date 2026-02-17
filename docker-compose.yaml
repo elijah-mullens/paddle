@@ -1,21 +1,25 @@
+name: canoe
+
 services:
   dev:
-    image: paddle
+    image: canoe
     build:
       context: .
       dockerfile: docker/Dockerfile
       args:
-        CUDA_VER: "12.9.1"
         UBUNTU_VER: "22.04"
+        PYHARP_VER: "1.8.8"
+        KINTERA_VER: "1.3.1"
+        SNAPY_VER: "1.3.1"
     environment:
       - USERNAME=${USER}
       - USER_UID=${USER_UID}
       - USER_GID=${USER_GID}
     volumes:
-      - .:/paddle
+      - ..:/work
       - ${GITCONFIG}:/etc/gitconfig
       - ${GITCREDENTIALS}:/etc/git-credentials
-    working_dir: /paddle
+    working_dir: /work
     tty: true
     stdin_open: true
     ports:

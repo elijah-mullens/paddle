@@ -1,13 +1,12 @@
 services:
   dev:
-    image: paddle
+    image: canoe
     build:
       dockerfile: docker/Dockerfile.cuda
       args:
         CUDA_VER: "12.9.1"
     gpus: all
     volumes:
-      - /home/${USER}/Model:/Model
       - dart_nfs:/data
 
 volumes:

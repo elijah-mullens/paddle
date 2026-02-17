@@ -57,7 +57,7 @@ ps: env ## Show container status
 
 start: env ## Open a bash shell inside the 'dev' container as the host user, exit without error
 	@docker compose exec --user $(UID):$(GID) dev \
-		bash -c 'git config --global --add safe.directory /paddle; source /opt/venv/bin/activate; exec bash'
+		bash -c 'git config --global --add safe.directory /canoe; source /opt/venv/bin/activate; exec bash'
 
 build: env ## Build (or rebuild) the 'dev' container and start it
 	@docker compose up -d --build dev
@@ -77,9 +77,9 @@ status: ## Show the job status
 
 mint: ## Mint the current environment
 	# Remove any git credential files from the dev container before snapshotting
-	docker exec paddle-dev-1 bash -lc 'rm -f /etc/git-credentials /root/.git-credentials /home/*/.git-credentials 2>/dev/null || true'
-	docker commit paddle-dev-1 ubuntu22.04-cuda12.9-py3.10-canoe:latest
-	docker tag ubuntu22.04-cuda12.9-py3.10-canoe:latest docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
+	docker exec canoe-dev-1 bash -lc 'rm -f /etc/git-credentials /root/.git-credentials /home/*/.git-credentials 2>/dev/null || true'
+	#docker commit canoe-dev-1 ubuntu22.04-cuda12.9-py3.10-canoe:latest
+	docker tag canoe:latest docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
 
 upload: ## Upload the minted image to docker hub
 	# Refuse to push if the image still contains git credential files
