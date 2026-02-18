@@ -7,9 +7,9 @@ ARG UBUNTU_VER=22.04
 ############################
 FROM nvidia/cuda:${CUDA_VER}-devel-ubuntu${UBUNTU_VER} AS base
 
-ARG PYHARP_VER=1.8.8
-ARG KINTERA_VER=1.3.1
-ARG SNAPY_VER=1.3.1
+ARG PYHARP_VER=v1.8.8
+ARG KINTERA_VER=v1.3.1
+ARG SNAPY_VER=v1.3.1
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC
@@ -134,11 +134,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     set -eu pipefail; \
     if [ ! -d "pyharp/.git" ]; then \
       rm -rf pyharp; \
-      git clone --filter=blob:none --depth 1 https://github.com/chengcli/pyharp/ pyharp; \
+      git clone --filter=blob:none --depth 1 --no-single-branch https://github.com/chengcli/pyharp/ pyharp; \
     fi; \
     cd pyharp; \
     git fetch --force --tags --prune --depth 1; \
-    git checkout -f "v${PYHARP_VER}"; \
+    git checkout -f "${PYHARP_VER}"; \
     cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
     cmake --build build --parallel "$(nproc)"; \
     python -m pip install --no-cache-dir .
@@ -154,11 +154,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     set -eu pipefail; \
     if [ ! -d "kintera/.git" ]; then \
       rm -rf kintera; \
-      git clone --filter=blob:none --depth 1 https://github.com/chengcli/kintera/ kintera; \
+      git clone --filter=blob:none --depth 1 --no-single-branch https://github.com/chengcli/kintera/ kintera; \
     fi; \
     cd kintera; \
     git fetch --force --tags --prune --depth 1; \
-    git checkout -f "v${KINTERA_VER}"; \
+    git checkout -f "${KINTERA_VER}"; \
     cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
     cmake --build build --parallel "$(nproc)"; \
     python -m pip install --no-cache-dir .
@@ -174,11 +174,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     set -eu pipefail; \
     if [ ! -d "snapy/.git" ]; then \
       rm -rf snapy; \
-      git clone --filter=blob:none --depth 1 https://github.com/chengcli/snapy/ snapy; \
+      git clone --filter=blob:none --depth 1 --no-single-branch https://github.com/chengcli/snapy/ snapy; \
     fi; \
     cd snapy; \
     git fetch --force --tags --prune --depth 1; \
-    git checkout -f "v${SNAPY_VER}"; \
+    git checkout -f "${SNAPY_VER}"; \
     cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
     cmake --build build --parallel "$(nproc)"; \
     python -m pip install --no-cache-dir .
