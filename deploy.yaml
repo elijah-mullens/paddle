@@ -7,13 +7,13 @@ networks:
 
 services:
   captain:
-    image: luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:2026-02-05
+    image: ${REGISTRY}/canoe:tmp
     entrypoint: ["/bin/bash"]
     user: "${USER_UID}:${USER_GID}"
     networks:
       - raynet
     # args: run_command, master_addr, node_rank, proc_per_node, nodes
-    command: ['/work/run.sh', 'captain', '0', '1', '2']
+    command: ['run.sh', 'captain', '0', '2', '3']
     deploy:
       restart_policy:
         condition: none
@@ -22,7 +22,7 @@ services:
           generic_resources:
             - discrete_resource_spec:
                 kind: gpu
-                value: 1
+                value: 2
       replicas: 1
       placement:
         constraints:
@@ -35,17 +35,16 @@ services:
       - NCCL_SOCKET_IFNAME=eth0
     volumes:
       - .:/work
-      #- nfs:/data
     working_dir: /work
 
   crew1:
-    image: luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:2026-02-05
+    image: ${REGISTRY}/canoe:tmp
     entrypoint: ["/bin/bash"]
     user: "${USER_UID}:${USER_GID}"
     networks:
       - raynet
     # args: run_command, master_addr, node_rank, proc_per_node, nodes
-    command: ['/work/run.sh', 'captain', '1', '1', '2']
+    command: ['run.sh', 'captain', '1', '2', '3']
     deploy:
       restart_policy:
         condition: none
@@ -54,7 +53,7 @@ services:
           generic_resources:
             - discrete_resource_spec:
                 kind: gpu
-                value: 1
+                value: 2
       replicas: 1
       placement:
         constraints:
@@ -67,13 +66,35 @@ services:
       - NCCL_SOCKET_IFNAME=eth0
     volumes:
       - .:/work
-      #- nfs:/data
     working_dir: /work
 
-volumes:
-  nfs:
-    driver: local
-    driver_opts:
-      type: "nfs"
-      o: "addr=coe-chengcli.turbo.storage.umich.edu,nfsvers=3,rw,nolock,soft"
-      device: ":/coe-chengcli"
+  crew2:
+    image: ${REGISTRY}/canoe:tmp
+    entrypoint: ["/bin/bash"]
+    user: "${USER_UID}:${USER_GID}"
+    networks:
+      - raynet
+    # args: run_command, master_addr, node_rank, proc_per_node, nodes
+    command: ['run.sh', 'captain', '2', '2', '3']
+    deploy:
+      restart_policy:
+        condition: none
+      resources:
+        reservations:
+          generic_resources:
+            - discrete_resource_spec:
+                kind: gpu
+                value: 2
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.role == crew
+    environment:
+      - USERNAME=${USER}
+      - USER_UID=${USER_UID}
+      - USER_GID=${USER_GID}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NCCL_SOCKET_IFNAME=eth0
+    volumes:
+      - .:/work
+    working_dir: /work
