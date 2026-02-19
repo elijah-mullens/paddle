@@ -1,0 +1,49 @@
+geometry:
+  type: cartesian
+  bounds: {x2min: -5, x2max: 5., x3min: -10, x3max: 10.}
+  cells: {nx1: 1, nx2: 256, nx3: 512, nghost: 3}
+
+distribute:
+  backend: gloo
+  layout: slab
+  nb2: 2
+  nb3: 2
+  verbose: false
+
+dynamics:
+  equation-of-state:
+    type: shallow-water
+
+  reconstruct:
+    vertical: {type: weno5, scale: false, shock: false}
+    horizontal: {type: weno5, scale: false, shock: false}
+
+  riemann-solver:
+    type: shallow-roe
+    dir: yz
+
+boundary-condition:
+  external:
+    x1-inner: reflecting
+    x1-outer: reflecting
+    x2-inner: reflecting
+    x2-outer: reflecting
+    x3-inner: periodic
+    x3-outer: periodic
+
+integration:
+  type: rk3
+  cfl: 0.9
+  nlim: -1
+  tlim: 9
+  ncycle_out: 10
+
+outputs:
+  - type: netcdf
+    variables: [prim]
+    dt: 0.1
+
+problem:
+  phi: 10.
+  uphi: 10.
+  dphi: 2.0
