@@ -61,11 +61,14 @@ x3v, x2v, x1v = torch.meshgrid(
 
 # initialize from "robert.final.restart" if exists
 if os.path.exists("./robert_results/robert.final.restart"):
+    initial_tlim = block.options.intg().tlim()
     block_vars, current_time = block.initialize_from_restart("robert.final.restart")
     # extend the time by a factor of 2
     block.options.intg().tlim(2.0 * block.options.intg().tlim())
     print(
-        "Initialized from robert.final.restart, extending time to",
+        "Initialized from robert.final.restart, extending time from", 
+        initial_tlim,
+        "to",
         block.options.intg().tlim(),
     )
 else:
