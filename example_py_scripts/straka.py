@@ -66,9 +66,7 @@ w[kIPR] = p0 * torch.pow(temp / Ts, cp / Rd)
 temp += torch.where(L <= 1, dT * (torch.cos(L * math.pi) + 1.0) / 2.0, 0)
 w[kIDN] = w[kIPR] / (Rd * temp)
 
-block_vars = {}
-block_vars["hydro_w"] = w
-block_vars, current_time = block.initialize(block_vars)
+block_vars, current_time = block.initialize({"hydro_w": w})
 
 # integration
 block.make_outputs(block_vars, current_time)
