@@ -3,6 +3,7 @@ import math
 import kintera
 from snapy import MeshBlockOptions, MeshBlock
 from snapy import kIDN, kIPR
+import os
 
 
 def call_user_output(bvars):
@@ -39,6 +40,12 @@ else:
 
 # set hydrodynamic options
 op = MeshBlockOptions.from_yaml("straka.yaml")
+
+# Set output directory 
+output_directory = './straka_results/'
+os.makedirs(output_directory, exist_ok=True)
+op.output_dir(output_directory)
+
 
 # initialize block
 block = MeshBlock(op)
