@@ -35,6 +35,13 @@ else:
 
 # set hydrodynamic options
 op = MeshBlockOptions.from_yaml("robert.yaml")
+
+# Set output directory 
+output_directory = './robert_results/'
+os.makedirs(output_directory, exist_ok=True)
+op.output_dir(output_directory)
+
+# initialize block
 block = MeshBlock(op)
 
 # get handles to modules
@@ -53,7 +60,7 @@ x3v, x2v, x1v = torch.meshgrid(
 )
 
 # initialize from "robert.final.restart" if exists
-if os.path.exists("robert.final.restart"):
+if os.path.exists("./robert_results/robert.final.restart"):
     block_vars, current_time = block.initialize_from_restart("robert.final.restart")
     # extend the time by a factor of 2
     block.options.intg().tlim(2.0 * block.options.intg().tlim())
@@ -74,11 +81,14 @@ else:
     w[kIPR] = p0 * torch.pow(temp / Ts, cp / Rd)
 
     r = torch.sqrt((x3v - yc) ** 2 + (x2v - xc) ** 2 + (x1v - zc) ** 2)
-    temp += torch.where(r <= a, dT * torch.pow(w[kIPR] / p0, Rd / cp), 0.0)
+    # Add the temperature anomaly of the bubble to the temperature field
+    temp += torch.where(r <= a, dT, 0.0)
+
+    # Add the temperature gradient around the bubble 
     if not uniform_bubble:
         temp += torch.where(
             r > a,
-            dT * torch.exp(-(((r - a) / s) ** 2)) * torch.pow(w[kIPR] / p0, Rd / cp),
+            dT * torch.exp(-(((r - a) / s) ** 2)),
             0.0,
         )
     w[kIDN] = w[kIPR] / (Rd * temp)

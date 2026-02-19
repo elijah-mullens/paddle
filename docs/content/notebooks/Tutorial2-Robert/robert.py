@@ -3,6 +3,7 @@ import math
 import kintera
 from snapy import MeshBlockOptions, MeshBlock
 from snapy import kIDN, kIPR
+import os
 
 
 def call_user_output(bvars):
@@ -34,6 +35,12 @@ else:
 
 # set hydrodynamic options
 op = MeshBlockOptions.from_yaml("robert.yaml")
+
+# Set output directory 
+output_directory = './robert_results/'
+os.makedirs(output_directory, exist_ok=True)
+op.output_dir(output_directory)
+
 block = MeshBlock(op)
 block.to(device)
 
@@ -64,11 +71,14 @@ temp = Ts - grav * x1v / cp
 w[kIPR] = p0 * torch.pow(temp / Ts, cp / Rd)
 
 r = torch.sqrt((x3v - yc) ** 2 + (x2v - xc) ** 2 + (x1v - zc) ** 2)
-temp += torch.where(r <= a, dT * torch.pow(w[kIPR] / p0, Rd / cp), 0.0)
+# Add the temperature anomaly of the bubble to the temperature field
+temp += torch.where(r <= a, dT, 0.0)
+
+# Add the temperature gradient around the bubble 
 if not uniform_bubble:
     temp += torch.where(
         r > a,
-        dT * torch.exp(-(((r - a) / s) ** 2)) * torch.pow(w[kIPR] / p0, Rd / cp),
+        dT * torch.exp(-(((r - a) / s) ** 2)),
         0.0,
     )
 w[kIDN] = w[kIPR] / (Rd * temp)
