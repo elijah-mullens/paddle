@@ -58,7 +58,7 @@ nc2 = coord.buffer("x2v").shape[0]
 nc1 = coord.buffer("x1v").shape[0]
 nvar = 5
 
-w = torch.zeros((nvar, nc3, nc2, nc1), device=device)
+w = torch.zeros((nvar, nc3, nc2, nc1), device = device)
 
 temp = Ts - grav * x1v / cp
 w[kIPR] = p0 * torch.pow(temp / Ts, cp / Rd)

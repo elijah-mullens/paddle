@@ -1,6 +1,7 @@
 import torch
 import math
 import kintera
+import os
 from snapy import MeshBlockOptions, MeshBlock
 from snapy import kIDN, kIPR
 
@@ -35,7 +36,6 @@ else:
 # set hydrodynamic options
 op = MeshBlockOptions.from_yaml("robert.yaml")
 block = MeshBlock(op)
-block.to(device)
 
 # get handles to modules
 coord = block.module("coord")
@@ -52,34 +52,41 @@ x3v, x2v, x1v = torch.meshgrid(
     coord.buffer("x3v"), coord.buffer("x2v"), coord.buffer("x1v"), indexing="ij"
 )
 
-# dimensions
-nc3 = coord.buffer("x3v").shape[0]
-nc2 = coord.buffer("x2v").shape[0]
-nc1 = coord.buffer("x1v").shape[0]
-nvar = 5
-
-w = torch.zeros((nvar, nc3, nc2, nc1), device=device)
-
-temp = Ts - grav * x1v / cp
-w[kIPR] = p0 * torch.pow(temp / Ts, cp / Rd)
-
-r = torch.sqrt((x3v - yc) ** 2 + (x2v - xc) ** 2 + (x1v - zc) ** 2)
-temp += torch.where(r <= a, dT * torch.pow(w[kIPR] / p0, Rd / cp), 0.0)
-if not uniform_bubble:
-    temp += torch.where(
-        r > a,
-        dT * torch.exp(-(((r - a) / s) ** 2)) * torch.pow(w[kIPR] / p0, Rd / cp),
-        0.0,
+# initialize from "robert.final.restart" if exists
+if os.path.exists("robert.final.restart"):
+    block_vars, current_time = block.initialize_from_restart("robert.final.restart")
+    # extend the time by a factor of 2
+    block.options.intg().tlim(2.0 * block.options.intg().tlim())
+    print(
+        "Initialized from robert.final.restart, extending time to",
+        block.options.intg().tlim(),
     )
-w[kIDN] = w[kIPR] / (Rd * temp)
+else:
+    # dimensions
+    nc3 = coord.buffer("x3v").shape[0]
+    nc2 = coord.buffer("x2v").shape[0]
+    nc1 = coord.buffer("x1v").shape[0]
 
-block_vars = {}
-block_vars["hydro_w"] = w
-block_vars, current_time = block.initialize(block_vars)
+    # An alternative way to get nvar instead of manually setting it
+    w = torch.zeros((eos.nvar(), nc3, nc2, nc1), device=device)
 
-block.set_user_output_func(call_user_output)
+    temp = Ts - grav * x1v / cp
+    w[kIPR] = p0 * torch.pow(temp / Ts, cp / Rd)
+
+    r = torch.sqrt((x3v - yc) ** 2 + (x2v - xc) ** 2 + (x1v - zc) ** 2)
+    temp += torch.where(r <= a, dT * torch.pow(w[kIPR] / p0, Rd / cp), 0.0)
+    if not uniform_bubble:
+        temp += torch.where(
+            r > a,
+            dT * torch.exp(-(((r - a) / s) ** 2)) * torch.pow(w[kIPR] / p0, Rd / cp),
+            0.0,
+        )
+    w[kIDN] = w[kIPR] / (Rd * temp)
+
+    block_vars, current_time = block.initialize({"hydro_w": w})
 
 # integration
+block.set_user_output_func(call_user_output)
 block.make_outputs(block_vars, current_time)
 
 while not block.intg.stop(block.inc_cycle(), current_time):
