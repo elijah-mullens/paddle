@@ -3,7 +3,6 @@ distribute:
   layout: slab
   nb2: 4
   nb3: 1
-  verbose: false
 
 geometry:
   type: cartesian
@@ -54,7 +53,7 @@ integration:
   cfl: 0.9
   implicit-scheme: 0
   nlim: -1
-  tlim: 1080
+  tlim: 270
   ncycle_out: 10
 
 outputs:
