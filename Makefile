@@ -7,7 +7,7 @@ DATE_STRING := $(shell date "+%Y-%m-%d")
 JOB := canoe$(date +%Y%m%d_%H%M%S)
 HOST := $${HOSTNAME}
 
-.PHONY: help env up down ps start build deploy finish log log1 log2 status status1 status2 mint upload node resource
+.PHONY: help env up down ps start build deploy finish log status mint upload node resource
 
 # Show help for each target
 help: ## Show this help message
@@ -74,22 +74,14 @@ finish: ## Clean up the deployed job
 	@docker stack rm ${JOB}
 
 log: ## Show the job log file
+	docker service logs ${JOB}_crew1
+	docker service logs ${JOB}_crew2
 	docker service logs ${JOB}_captain
 
-log1: ## Show the job log file for crew1
-	docker service logs ${JOB}_crew1
-
-log2: ## Show the job log file for crew2
-	docker service logs ${JOB}_crew2
-
 status: ## Show the job status
-	docker service ps ${JOB}_captain --no-trunc
-
-status1: ## Show the job status for crew1
 	docker service ps ${JOB}_crew1 --no-trunc
-
-status2: ## Show the job status for crew2
 	docker service ps ${JOB}_crew2 --no-trunc
+	docker service ps ${JOB}_captain --no-trunc
 
 mint: ## Mint the current environment to docker hub
 	docker exec canoe-dev-1 bash -lc 'rm -f /etc/git-credentials /root/.git-credentials /home/*/.git-credentials 2>/dev/null || true'
