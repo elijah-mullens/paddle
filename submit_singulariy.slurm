@@ -43,7 +43,7 @@ echo "NODELIST=${SLURM_JOB_NODELIST}"
 
 # ---- Launch one torchrun per node; torchrun spawns 2 procs on that node ----
 srun --nodes=${NNODES} --ntasks=${NNODES} --ntasks-per-node=1 \
-  singularity exec --nv "${SIF}" bash -lc '
+  singularity exec --nv --pwd "$PWD" "${SIF}" bash -lc '
     set -euo pipefail
 
     echo "Running on $(hostname)  SLURM_PROCID=${SLURM_PROCID}"
