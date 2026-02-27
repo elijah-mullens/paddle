@@ -18,6 +18,10 @@ def call_user_output(bvars: dict[str, torch.Tensor]):
     return out
 
 
+def add_wall_interaction(bvars: dict[str, torch.Tensor], coord):
+    nghost = cood.options.nghost()
+
+
 def run_with(infile: str, restart_file: str):
     with open(infile, "r") as f:
         config = yaml.safe_load(f)
@@ -83,6 +87,8 @@ def run_with(infile: str, restart_file: str):
 
         for stage in range(len(block.intg.stages)):
             block.forward(block_vars, dt, stage)
+            add_wall_interaction(block_vars)
+            add_acceleration(block_vars)
 
         err = block.check_redo(block_vars)
         if err > 0:

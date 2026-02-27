@@ -70,10 +70,10 @@ geometry:
     nghost: 3
 
 distribute:
-  backend: gloo
+  backend: nccl
   layout: slab
-  nb2: 2
-  nb3: 2
+  nb2: 1
+  nb3: 1
   verbose: false
 
 dynamics:
@@ -108,7 +108,7 @@ boundary-condition:
 
 integration:
   type: rk3
-  cfl: 0.45
+  cfl: 0.9
   implicit-scheme: 1
   nlim: -1
   tlim: 100.e5

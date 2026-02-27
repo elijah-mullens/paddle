@@ -5,6 +5,7 @@ GITCONFIG := $${HOME}/.gitconfig
 GITCREDENTIALS := $${HOME}/.git-credentials
 DATE_STRING := $(shell date "+%Y-%m-%d")
 JOB := canoe$(date +%Y%m%d_%H%M%S)
+HOST := $${HOSTNAME}
 
 .PHONY: help env up down ps start build deploy finish log status mint upload node resource
 
@@ -35,6 +36,7 @@ env: ## Generate the .env file with git configs first, then user info
 		echo "USER=$$(id -un)"    >> $(ENV_FILE); \
 		echo "USER_UID=$$(id -u)" >> $(ENV_FILE); \
 		echo "USER_GID=$$(id -g)" >> $(ENV_FILE); \
+		echo "REGISTRY=${HOST}:5000" >> $(ENV_FILE); \
 		echo "Created $(ENV_FILE):"; cat $(ENV_FILE); \
 	fi
 
@@ -63,23 +65,33 @@ build: env ## Build (or rebuild) the 'dev' container and start it
 	@docker compose up -d --build dev
 
 deploy: env ## Deploy a multi-node job to cluster
-	@USER_UID="$$(id -u)" USER_GID="$$(id -g)" docker stack deploy -c deploy.yaml ${JOB}
+	@docker tag canoe:latest ${HOST}:5000/canoe:tmp
+	@docker push ${HOST}:5000/canoe:tmp
+	@USER_UID="$$(id -u)" USER_GID="$$(id -g)" REGISTRY="${HOST}:5000" docker stack deploy -c deploy.yaml ${JOB}
 	@echo -e "\033[32m[OK]\033[0m ${JOB} deployed"
 
 finish: ## Clean up the deployed job
 	@docker stack rm ${JOB}
 
 log: ## Show the job log file
+	docker service logs ${JOB}_crew1
+	docker service logs ${JOB}_crew2
 	docker service logs ${JOB}_captain
 
 status: ## Show the job status
-	docker service ps ${JOB}_captain
+	docker service ps ${JOB}_crew1 --no-trunc
+	docker service ps ${JOB}_crew2 --no-trunc
+	docker service ps ${JOB}_captain --no-trunc
 
-mint: ## Mint the current environment
-	# Remove any git credential files from the dev container before snapshotting
+mint: ## Mint the current environment to docker hub
 	docker exec canoe-dev-1 bash -lc 'rm -f /etc/git-credentials /root/.git-credentials /home/*/.git-credentials 2>/dev/null || true'
-	#docker commit canoe-dev-1 ubuntu22.04-cuda12.9-py3.10-canoe:latest
 	docker tag canoe:latest docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
+
+save: ## Save a temporary version
+	docker save canoe:latest | gzip > ${HOME}/data/canoe_tmp.tar.gz
+
+load: ## Load a temporary version
+	gunzip -c ${HOME}/data/canoe_tmp.tar.gz | docker load
 
 upload: ## Upload the minted image to docker hub
 	# Refuse to push if the image still contains git credential files
