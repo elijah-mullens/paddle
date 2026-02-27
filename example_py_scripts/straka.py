@@ -30,7 +30,6 @@ block = MeshBlock(op)
 # use cuda if available
 if torch.cuda.is_available() and op.layout().backend() == "nccl":
     device = torch.device(block.device())
-    print("device = ", device)
 else:
     device = torch.device("cpu")
 
