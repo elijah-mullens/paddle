@@ -18,7 +18,7 @@ def call_user_output(bvars: dict[str, torch.Tensor]):
     return out
 
 
-def run_with(infile: str, restart_file:str):
+def run_with(infile: str, restart_file: str):
     with open(infile, "r") as f:
         config = yaml.safe_load(f)
 
@@ -46,7 +46,7 @@ def run_with(infile: str, restart_file:str):
 
     block_vars = {}
 
-    if restart_file != '':
+    if restart_file != "":
         module = torch.jit.load(restart_file)
         for name, data in module.named_buffers():
             block_vars[name] = data.to(device)
@@ -62,7 +62,9 @@ def run_with(infile: str, restart_file:str):
         block_vars["hydro_w"] = setup_profile(block, param, method="pseudo-adiabat")
 
         # add random vertical velocity
-        block_vars["hydro_w"][kIV1] += 0.1 * torch.rand_like(block_vars["hydro_w"][kIV1])
+        block_vars["hydro_w"][kIV1] += 0.1 * torch.rand_like(
+            block_vars["hydro_w"][kIV1]
+        )
         block_vars, current_time = block.initialize(block_vars)
 
     block.set_user_output_func(call_user_output)
@@ -103,13 +105,15 @@ def main():
     # parse arguments
     parser = argparse.ArgumentParser(description="Run hydrodynamic simulation.")
     parser.add_argument(
-        "-i", "--infile", type=str, 
-        required=True, help="Input YAML configuration file."
+        "-i", "--infile", type=str, required=True, help="Input YAML configuration file."
     )
     parser.add_argument(
-        "-r", "--restart", type=str, 
-        required=False, help="Restart from restart dump.",
-        default=""
+        "-r",
+        "--restart",
+        type=str,
+        required=False,
+        help="Restart from restart dump.",
+        default="",
     )
     args = parser.parse_args()
     run_with(args.infile, args.restart)

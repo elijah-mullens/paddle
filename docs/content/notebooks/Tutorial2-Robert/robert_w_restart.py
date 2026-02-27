@@ -36,8 +36,8 @@ else:
 # set hydrodynamic options
 op = MeshBlockOptions.from_yaml("robert.yaml")
 
-# Set output directory 
-output_directory = './robert_results/'
+# Set output directory
+output_directory = "./robert_results/"
 os.makedirs(output_directory, exist_ok=True)
 op.output_dir(output_directory)
 
@@ -66,7 +66,7 @@ if os.path.exists("./robert_results/robert.final.restart"):
     # extend the time by a factor of 2
     block.options.intg().tlim(2.0 * block.options.intg().tlim())
     print(
-        "Initialized from robert.final.restart, extending time from", 
+        "Initialized from robert.final.restart, extending time from",
         initial_tlim,
         "to",
         block.options.intg().tlim(),
@@ -87,7 +87,7 @@ else:
     # Add the temperature anomaly of the bubble to the temperature field
     temp += torch.where(r <= a, dT, 0.0)
 
-    # Add the temperature gradient around the bubble 
+    # Add the temperature gradient around the bubble
     if not uniform_bubble:
         temp += torch.where(
             r > a,

@@ -36,8 +36,8 @@ else:
 # set hydrodynamic options
 op = MeshBlockOptions.from_yaml("robert.yaml")
 
-# Set output directory 
-output_directory = './robert_results/'
+# Set output directory
+output_directory = "./robert_results/"
 os.makedirs(output_directory, exist_ok=True)
 op.output_dir(output_directory)
 
@@ -65,7 +65,7 @@ nc2 = coord.buffer("x2v").shape[0]
 nc1 = coord.buffer("x1v").shape[0]
 nvar = 5
 
-w = torch.zeros((nvar, nc3, nc2, nc1), device = device)
+w = torch.zeros((nvar, nc3, nc2, nc1), device=device)
 
 temp = Ts - grav * x1v / cp
 w[kIPR] = p0 * torch.pow(temp / Ts, cp / Rd)
@@ -74,7 +74,7 @@ r = torch.sqrt((x3v - yc) ** 2 + (x2v - xc) ** 2 + (x1v - zc) ** 2)
 # Add the temperature anomaly of the bubble to the temperature field
 temp += torch.where(r <= a, dT, 0.0)
 
-# Add the temperature gradient around the bubble 
+# Add the temperature gradient around the bubble
 if not uniform_bubble:
     temp += torch.where(
         r > a,

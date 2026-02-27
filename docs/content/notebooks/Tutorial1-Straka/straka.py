@@ -41,8 +41,8 @@ else:
 # set hydrodynamic options
 op = MeshBlockOptions.from_yaml("straka.yaml")
 
-# Set output directory 
-output_directory = './straka_results/'
+# Set output directory
+output_directory = "./straka_results/"
 os.makedirs(output_directory, exist_ok=True)
 op.output_dir(output_directory)
 
