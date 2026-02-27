@@ -1,0 +1,578 @@
+diff --git a/Makefile b/Makefile
+index 7d2c9e7..e701ff0 100644
+--- a/Makefile
++++ b/Makefile
+@@ -5,6 +5,7 @@ GITCONFIG := $${HOME}/.gitconfig
+ GITCREDENTIALS := $${HOME}/.git-credentials
+ DATE_STRING := $(shell date "+%Y-%m-%d")
+ JOB := canoe$(date +%Y%m%d_%H%M%S)
++HOST := $${HOSTNAME}
+ 
+ .PHONY: help env up down ps start build deploy finish log status mint upload node resource
+ 
+@@ -35,6 +36,7 @@ env: ## Generate the .env file with git configs first, then user info
+ 		echo "USER=$$(id -un)"    >> $(ENV_FILE); \
+ 		echo "USER_UID=$$(id -u)" >> $(ENV_FILE); \
+ 		echo "USER_GID=$$(id -g)" >> $(ENV_FILE); \
++		echo "REGISTRY=${HOST}:5000" >> $(ENV_FILE); \
+ 		echo "Created $(ENV_FILE):"; cat $(ENV_FILE); \
+ 	fi
+ 
+@@ -63,24 +65,34 @@ build: env ## Build (or rebuild) the 'dev' container and start it
+ 	@docker compose up -d --build dev
+ 
+ deploy: env ## Deploy a multi-node job to cluster
+-	@USER_UID="$$(id -u)" USER_GID="$$(id -g)" docker stack deploy -c deploy.yaml ${JOB}
++	@docker tag canoe:latest ${HOST}:5000/canoe:tmp
++	@docker push ${HOST}:5000/canoe:tmp
++	@USER_UID="$$(id -u)" USER_GID="$$(id -g)" REGISTRY="${HOST}:5000" docker stack deploy -c deploy.yaml ${JOB}
+ 	@echo -e "\033[32m[OK]\033[0m ${JOB} deployed"
+ 
+ finish: ## Clean up the deployed job
+ 	@docker stack rm ${JOB}
+ 
+ log: ## Show the job log file
++	docker service logs ${JOB}_crew1
++	docker service logs ${JOB}_crew2
+ 	docker service logs ${JOB}_captain
+ 
+ status: ## Show the job status
+-	docker service ps ${JOB}_captain
++	docker service ps ${JOB}_crew1 --no-trunc
++	docker service ps ${JOB}_crew2 --no-trunc
++	docker service ps ${JOB}_captain --no-trunc
+ 
+-mint: ## Mint the current environment
+-	# Remove any git credential files from the dev container before snapshotting
++mint: ## Mint the current environment to docker hub
+ 	docker exec canoe-dev-1 bash -lc 'rm -f /etc/git-credentials /root/.git-credentials /home/*/.git-credentials 2>/dev/null || true'
+-	#docker commit canoe-dev-1 ubuntu22.04-cuda12.9-py3.10-canoe:latest
+ 	docker tag canoe:latest docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
+ 
++save: ## Save a temporary version
++	docker save canoe:latest | gzip > ${HOME}/data/canoe_tmp.tar.gz
++
++load: ## Load a temporary version
++	gunzip -c ${HOME}/data/canoe_tmp.tar.gz | docker load
++
+ upload: ## Upload the minted image to docker hub
+ 	# Refuse to push if the image still contains git credential files
+ 	docker run --rm docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING} sh -c '\
+diff --git a/README_HPC.md b/README_HPC.md
+index 9220523..ebdd5de 100644
+--- a/README_HPC.md
++++ b/README_HPC.md
+@@ -2,7 +2,7 @@ Using singularity
+ 
+ 1. Pull an docker image
+ ```
+-singularity pull docker://luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:2026-02-06
++singularity pull docker://luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:2026-02-18
+ ```
+ 
+ 2. Check cache
+@@ -22,5 +22,5 @@ export SINGULARITY_CACHEDIR=/path/to/cache
+ 
+ 5. Run a singularity shell
+ ```
+-singularity shell --nv ubuntu22.04-cuda12.9-py3.10-canoe_2026-02-06.sif
++singularity shell --nv ubuntu22.04-cuda12.9-py3.10-canoe_2026-02-18.sif
+ ```
+diff --git a/deploy.yaml b/deploy.yaml
+index 9a41afd..fe4748c 100644
+--- a/deploy.yaml
++++ b/deploy.yaml
+@@ -7,13 +7,13 @@ networks:
+ 
+ services:
+   captain:
+-    image: luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:2026-02-05
++    image: ${REGISTRY}/canoe:tmp
+     entrypoint: ["/bin/bash"]
+     user: "${USER_UID}:${USER_GID}"
+     networks:
+       - raynet
+     # args: run_command, master_addr, node_rank, proc_per_node, nodes
+-    command: ['/work/run.sh', 'captain', '0', '1', '2']
++    command: ['run.sh', 'captain', '0', '2', '3']
+     deploy:
+       restart_policy:
+         condition: none
+@@ -22,7 +22,7 @@ services:
+           generic_resources:
+             - discrete_resource_spec:
+                 kind: gpu
+-                value: 1
++                value: 2
+       replicas: 1
+       placement:
+         constraints:
+@@ -35,17 +35,16 @@ services:
+       - NCCL_SOCKET_IFNAME=eth0
+     volumes:
+       - .:/work
+-      #- nfs:/data
+     working_dir: /work
+ 
+   crew1:
+-    image: luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:2026-02-05
++    image: ${REGISTRY}/canoe:tmp
+     entrypoint: ["/bin/bash"]
+     user: "${USER_UID}:${USER_GID}"
+     networks:
+       - raynet
+     # args: run_command, master_addr, node_rank, proc_per_node, nodes
+-    command: ['/work/run.sh', 'captain', '1', '1', '2']
++    command: ['run.sh', 'captain', '1', '2', '3']
+     deploy:
+       restart_policy:
+         condition: none
+@@ -54,7 +53,7 @@ services:
+           generic_resources:
+             - discrete_resource_spec:
+                 kind: gpu
+-                value: 1
++                value: 2
+       replicas: 1
+       placement:
+         constraints:
+@@ -67,13 +66,35 @@ services:
+       - NCCL_SOCKET_IFNAME=eth0
+     volumes:
+       - .:/work
+-      #- nfs:/data
+     working_dir: /work
+ 
+-volumes:
+-  nfs:
+-    driver: local
+-    driver_opts:
+-      type: "nfs"
+-      o: "addr=coe-chengcli.turbo.storage.umich.edu,nfsvers=3,rw,nolock,soft"
+-      device: ":/coe-chengcli"
++  crew2:
++    image: ${REGISTRY}/canoe:tmp
++    entrypoint: ["/bin/bash"]
++    user: "${USER_UID}:${USER_GID}"
++    networks:
++      - raynet
++    # args: run_command, master_addr, node_rank, proc_per_node, nodes
++    command: ['run.sh', 'captain', '2', '2', '3']
++    deploy:
++      restart_policy:
++        condition: none
++      resources:
++        reservations:
++          generic_resources:
++            - discrete_resource_spec:
++                kind: gpu
++                value: 2
++      replicas: 1
++      placement:
++        constraints:
++          - node.labels.role == crew
++    environment:
++      - USERNAME=${USER}
++      - USER_UID=${USER_UID}
++      - USER_GID=${USER_GID}
++      - NVIDIA_VISIBLE_DEVICES=all
++      - NCCL_SOCKET_IFNAME=eth0
++    volumes:
++      - .:/work
++    working_dir: /work
+diff --git a/example_py_scripts/jupiter_crm.yaml b/example_py_scripts/jupiter_crm.yaml
+index 7ba0d79..0c3083c 100644
+--- a/example_py_scripts/jupiter_crm.yaml
++++ b/example_py_scripts/jupiter_crm.yaml
+@@ -70,10 +70,10 @@ geometry:
+     nghost: 3
+ 
+ distribute:
+-  backend: gloo
++  backend: nccl
+   layout: slab
+-  nb2: 2
+-  nb3: 2
++  nb2: 1
++  nb3: 1
+   verbose: false
+ 
+ dynamics:
+@@ -108,7 +108,7 @@ boundary-condition:
+ 
+ integration:
+   type: rk3
+-  cfl: 0.45
++  cfl: 0.9
+   implicit-scheme: 1
+   nlim: -1
+   tlim: 100.e5
+diff --git a/example_py_scripts/run_channel_flow.py b/example_py_scripts/run_channel_flow.py
+new file mode 100644
+index 0000000..b40c73e
+--- /dev/null
++++ b/example_py_scripts/run_channel_flow.py
+@@ -0,0 +1,129 @@
++import torch
++
++import yaml
++
++import argparse
++from snapy import MeshBlockOptions, MeshBlock, kICY, kIV1
++from kintera import ThermoX, KineticsOptions, Kinetics
++from paddle import (
++    setup_profile,
++    evolve_kinetics,
++)
++
++
++def call_user_output(bvars: dict[str, torch.Tensor]):
++    hydro_w = bvars["hydro_w"]
++    out = {}
++    out["qtol"] = hydro_w[kICY:].sum(dim=0)
++    return out
++
++
++def add_wall_interaction(bvars: dict[str, torch.Tensor], coord):
++    nghost = cood.options.nghost()
++
++
++def run_with(infile: str, restart_file: str):
++    with open(infile, "r") as f:
++        config = yaml.safe_load(f)
++
++    # set hydrodynamic options
++    op = MeshBlockOptions.from_yaml(infile)
++    block = MeshBlock(op)
++
++    # use cuda if available
++    if torch.cuda.is_available() and op.layout().backend() == "nccl":
++        device = torch.device(block.device())
++        print("device = ", device)
++    else:
++        device = torch.device("cpu")
++
++    block.to(device)
++
++    # get handles to modules
++    coord = block.module("coord")
++    thermo_y = block.module("hydro.eos.thermo")
++    eos = block.module("hydro.eos")
++    # thermo_y.options.max_iter(100)
++
++    thermo_x = ThermoX(thermo_y.options)
++    thermo_x.to(device)
++
++    block_vars = {}
++
++    if restart_file != "":
++        module = torch.jit.load(restart_file)
++        for name, data in module.named_buffers():
++            block_vars[name] = data.to(device)
++    else:
++        param = {}
++        param["Ts"] = float(config["problem"]["Ts"])
++        param["Ps"] = float(config["problem"]["Ps"])
++        param["grav"] = -float(config["forcing"]["const-gravity"]["grav1"])
++        param["Tmin"] = float(config["problem"]["Tmin"])
++        for name in thermo_y.options.species():
++            param[f"x{name}"] = float(config["problem"].get(f"x{name}", 0.0))
++
++        block_vars["hydro_w"] = setup_profile(block, param, method="pseudo-adiabat")
++
++        # add random vertical velocity
++        block_vars["hydro_w"][kIV1] += 0.1 * torch.rand_like(
++            block_vars["hydro_w"][kIV1]
++        )
++        block_vars, current_time = block.initialize(block_vars)
++
++    block.set_user_output_func(call_user_output)
++
++    # kinetics model
++    op_kinet = KineticsOptions.from_yaml(infile)
++    kinet = Kinetics(op_kinet)
++    kinet.to(device)
++
++    # integration
++    block.make_outputs(block_vars, current_time)
++
++    while not block.intg.stop(block.inc_cycle(), current_time):
++        dt = block.max_time_step(block_vars)
++        block.print_cycle_info(block_vars, current_time, dt)
++
++        for stage in range(len(block.intg.stages)):
++            block.forward(block_vars, dt, stage)
++            add_wall_interaction(block_vars)
++            add_acceleration(block_vars)
++
++        err = block.check_redo(block_vars)
++        if err > 0:
++            continue  # redo current step
++        if err < 0:
++            break  # terminate
++
++        del_rho = evolve_kinetics(
++            block_vars["hydro_w"], eos, thermo_x, thermo_y, kinet, dt
++        )
++        block_vars["hydro_u"][kICY:] += del_rho
++
++        current_time += dt
++        block.make_outputs(block_vars, current_time)
++
++    block.finalize(block_vars, current_time)
++
++
++def main():
++    # parse arguments
++    parser = argparse.ArgumentParser(description="Run hydrodynamic simulation.")
++    parser.add_argument(
++        "-i", "--infile", type=str, required=True, help="Input YAML configuration file."
++    )
++    parser.add_argument(
++        "-r",
++        "--restart",
++        type=str,
++        required=False,
++        help="Restart from restart dump.",
++        default="",
++    )
++    args = parser.parse_args()
++    run_with(args.infile, args.restart)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/example_py_scripts/run_hydro.py b/example_py_scripts/run_hydro.py
+index 358822f..4c33fef 100644
+--- a/example_py_scripts/run_hydro.py
++++ b/example_py_scripts/run_hydro.py
+@@ -3,7 +3,7 @@ import torch
+ import yaml
+ 
+ import argparse
+-from snapy import MeshBlockOptions, MeshBlock, kICY
++from snapy import MeshBlockOptions, MeshBlock, kICY, kIV1
+ from kintera import ThermoX, KineticsOptions, Kinetics
+ from paddle import (
+     setup_profile,
+@@ -18,22 +18,25 @@ def call_user_output(bvars: dict[str, torch.Tensor]):
+     return out
+ 
+ 
+-def run_with(infile: str):
++def run_with(infile: str, restart_file:str):
+     with open(infile, "r") as f:
+         config = yaml.safe_load(f)
+ 
++    # set hydrodynamic options
++    op = MeshBlockOptions.from_yaml(infile)
++    block = MeshBlock(op)
++
+     # use cuda if available
+-    if torch.cuda.is_available():
+-        device = torch.device("cuda:0")
++    if torch.cuda.is_available() and op.layout().backend() == "nccl":
++        device = torch.device(block.device())
++        print("device = ", device)
+     else:
+         device = torch.device("cpu")
+ 
+-    # set hydrodynamic options
+-    op = MeshBlockOptions.from_yaml(infile)
+-    block = MeshBlock(op)
+     block.to(device)
+ 
+     # get handles to modules
++    coord = block.module("coord")
+     thermo_y = block.module("hydro.eos.thermo")
+     eos = block.module("hydro.eos")
+     # thermo_y.options.max_iter(100)
+@@ -41,17 +44,26 @@ def run_with(infile: str):
+     thermo_x = ThermoX(thermo_y.options)
+     thermo_x.to(device)
+ 
+-    param = {}
+-    param["Ts"] = float(config["problem"]["Ts"])
+-    param["Ps"] = float(config["problem"]["Ps"])
+-    param["grav"] = -float(config["forcing"]["const-gravity"]["grav1"])
+-    param["Tmin"] = float(config["problem"]["Tmin"])
+-    for name in thermo_y.options.species():
+-        param[f"x{name}"] = float(config["problem"].get(f"x{name}", 0.0))
+-
+     block_vars = {}
+-    block_vars["hydro_w"] = setup_profile(block, param, method="pseudo-adiabat")
+-    block_vars, current_time = block.initialize(block_vars)
++
++    if restart_file != '':
++        module = torch.jit.load(restart_file)
++        for name, data in module.named_buffers():
++            block_vars[name] = data.to(device)
++    else:
++        param = {}
++        param["Ts"] = float(config["problem"]["Ts"])
++        param["Ps"] = float(config["problem"]["Ps"])
++        param["grav"] = -float(config["forcing"]["const-gravity"]["grav1"])
++        param["Tmin"] = float(config["problem"]["Tmin"])
++        for name in thermo_y.options.species():
++            param[f"x{name}"] = float(config["problem"].get(f"x{name}", 0.0))
++
++        block_vars["hydro_w"] = setup_profile(block, param, method="pseudo-adiabat")
++
++        # add random vertical velocity
++        block_vars["hydro_w"][kIV1] += 0.1 * torch.rand_like(block_vars["hydro_w"][kIV1])
++        block_vars, current_time = block.initialize(block_vars)
+ 
+     block.set_user_output_func(call_user_output)
+ 
+@@ -91,10 +103,16 @@ def main():
+     # parse arguments
+     parser = argparse.ArgumentParser(description="Run hydrodynamic simulation.")
+     parser.add_argument(
+-        "-i", "--infile", type=str, required=True, help="Input YAML configuration file."
++        "-i", "--infile", type=str, 
++        required=True, help="Input YAML configuration file."
++    )
++    parser.add_argument(
++        "-r", "--restart", type=str, 
++        required=False, help="Restart from restart dump.",
++        default=""
+     )
+     args = parser.parse_args()
+-    run_with(args.infile)
++    run_with(args.infile, args.restart)
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/example_py_scripts/run_straka.sh b/example_py_scripts/run_straka.sh
+new file mode 100755
+index 0000000..0a90300
+--- /dev/null
++++ b/example_py_scripts/run_straka.sh
+@@ -0,0 +1,18 @@
++#!/bin/bash
++
++# Pick master addr/port
++MASTER_ADDR=$(hostname)
++MASTER_PORT=29500
++
++srun --mpi=none -n 2 bash -c '
++  export RANK=$SLURM_PROCID
++  export WORLD_SIZE=$SLURM_NTASKS
++  export LOCAL_RANK=$SLURM_LOCALID
++  export NODE_RANK=$SLURM_NODEID
++  export MASTER_ADDR='"$MASTER_ADDR"'
++  export MASTER_PORT='"$MASTER_PORT"'
++
++  echo "Launching rank $RANK/$WORLD_SIZE on node $(hostname), local_rank=$LOCAL_RANK"
++
++  python ./straka.py
++'
+diff --git a/example_py_scripts/run_straka_v2.sh b/example_py_scripts/run_straka_v2.sh
+new file mode 100755
+index 0000000..576f730
+--- /dev/null
++++ b/example_py_scripts/run_straka_v2.sh
+@@ -0,0 +1,24 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++# Pick master addr/port (force IPv4)
++MASTER_ADDR="$(hostname -I | awk '{print $1}')"
++MASTER_PORT=29500
++
++# Optional: force gloo interface (good on clusters)
++# IFACE="$(ip route get 1.1.1.1 | awk '{for(i=1;i<=NF;i++) if ($i=="dev") print $(i+1)}')"
++# export GLOO_SOCKET_IFNAME="$IFACE"
++
++srun --mpi=none -n 2 bash -c "
++  export RANK=\$SLURM_PROCID
++  export WORLD_SIZE=\$SLURM_NTASKS
++  export LOCAL_RANK=\$SLURM_LOCALID
++  export NODE_RANK=\$SLURM_NODEID
++
++  export MASTER_ADDR=$MASTER_ADDR
++  export MASTER_PORT=$MASTER_PORT
++
++  echo \"Launching rank \$RANK/\$WORLD_SIZE on node \$(hostname), local_rank=\$LOCAL_RANK, master=$MASTER_ADDR:$MASTER_PORT\"
++
++  python ./straka.py
++"
+diff --git a/example_py_scripts/straka.py b/example_py_scripts/straka.py
+index 6ea7731..4216809 100644
+--- a/example_py_scripts/straka.py
++++ b/example_py_scripts/straka.py
+@@ -30,6 +30,7 @@ block = MeshBlock(op)
+ # use cuda if available
+ if torch.cuda.is_available() and op.layout().backend() == "nccl":
+     device = torch.device(block.device())
++    print("device = ", device)
+ else:
+     device = torch.device("cpu")
+ 
+diff --git a/submit_singulariy.slurm b/submit_singulariy.slurm
+new file mode 100644
+index 0000000..9b09bee
+--- /dev/null
++++ b/submit_singulariy.slurm
+@@ -0,0 +1,61 @@
++#!/bin/bash
++#SBATCH --job-name=<NAME>
++#SBATCH --account=<ACCOUNT>
++#SBATCH --partition=<PARTITION>
++#SBATCH --nodes=3
++#SBATCH --ntasks-per-node=1
++#SBATCH --gres=gpu:2
++#SBATCH --cpus-per-task=2
++#SBATCH --mem=64G
++#SBATCH --time=01:00:00
++#SBATCH --output=%x-%j.out
++#SBATCH --error=%x-%j.err
++
++set -euo pipefail
++
++# ---- User settings ----
++SIF=<SIF_FILE>
++PORT=29500
++
++# ---- Run settings ----
++EXE=<PYTHON_RUN_FILE>
++CONFIG=<CONFIG_YAML_FILE>
++OUTPUT_DIR=<OUTPUT_DIR>
++
++# ---- Derive rendezvous info from Slurm allocation ----
++export MASTER_ADDR="$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)"
++export MASTER_PORT="${PORT}"
++export NNODES="${SLURM_JOB_NUM_NODES}"
++export GPUS_PER_NODE=2
++export WORLD_SIZE=$((NNODES * GPUS_PER_NODE))
++
++echo "MASTER_ADDR=${MASTER_ADDR}"
++echo "MASTER_PORT=${MASTER_PORT}"
++echo "NNODES=${NNODES}  GPUS_PER_NODE=${GPUS_PER_NODE}  WORLD_SIZE=${WORLD_SIZE}"
++echo "NODELIST=${SLURM_JOB_NODELIST}"
++
++# ---- Helpful NCCL/transport knobs (adjust to your cluster) ----
++# export NCCL_DEBUG=INFO
++# export NCCL_ASYNC_ERROR_HANDLING=1
++# export NCCL_IB_DISABLE=1                 # uncomment if no InfiniBand
++# export NCCL_SOCKET_IFNAME=ib0            # or eno1/bond0/etc
++# export GLOO_SOCKET_IFNAME=ib0
++
++# ---- Launch one torchrun per node; torchrun spawns 2 procs on that node ----
++srun --nodes=${NNODES} --ntasks=${NNODES} --ntasks-per-node=1 \
++  singularity exec --nv "${SIF}" bash -lc '
++    set -euo pipefail
++
++    echo "Running on $(hostname)  SLURM_PROCID=${SLURM_PROCID}"
++    export NODE_RANK=${SLURM_PROCID}
++
++    source /opt/venv/bin/activate
++
++    torchrun \
++      --nnodes='"${NNODES}"' \
++      --nproc_per_node='"${GPUS_PER_NODE}"' \
++      --node_rank=${NODE_RANK} \
++      --master_addr='"${MASTER_ADDR}"' \
++      --master_port='"${MASTER_PORT}"' \
++      '"${EXE}"' --config='"${CONFIG}"' --output-dir='"${OUTPUT_DIR}"'
++  '
