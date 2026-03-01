@@ -1,0 +1,60 @@
+reference-state:
+  Tref: 0.
+  Pref: 1.e5
+
+species:
+  - name: dry
+    composition: {O: 0.42, N: 1.56, Ar: 0.01}
+    cv_R: 2.5
+
+geometry:
+  type: cartesian
+  bounds: {x1min: -0.5, x1max: 0.5, x2min: -0.5, x2max: 0.5, x3min: -0.5, x3max: 0.5}
+  cells: {nx1: 256, nx2: 256, nx3: 1, nghost: 3}
+
+dynamics:
+  equation-of-state:
+    type: ideal-gas
+    density-floor:  1.e-10
+    pressure-floor: 1.e-10
+    limiter: false
+
+  vertical-projection:
+    type: none
+    pressure-margin: 1.e-6
+
+  reconstruct:
+    vertical: {type: weno5, scale: false, shock: true}
+    horizontal: {type: weno5, scale: false, shock: true}
+
+  riemann-solver:
+    type: hllc
+
+boundary-condition:
+  internal:
+    solid-density: 1.e3
+    solid-pressure: 1.e9
+    max-iter: 5
+
+  external:
+    x1-inner: outflow
+    x1-outer: outflow
+    x2-inner: outflow
+    x2-outer: outflow
+    x3-inner: outflow
+    x3-outer: outflow
+
+integration:
+  type: rk3
+  cfl: 0.9
+  implicit-scheme: 0
+  nlim: 200
+  tlim: 1.0
+  ncycle_out: 10
+
+outputs:
+  - type: restart
+    dt: 0.1
+  - type: netcdf
+    variables: [prim]
+    dt: 0.01
