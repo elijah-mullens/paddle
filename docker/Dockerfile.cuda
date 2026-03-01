@@ -95,6 +95,9 @@ COPY docker/requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip wheel -r requirements.txt -w /tmp/wheelhouse
 
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip wheel -r requirements.txt -w /tmp/wheelhouse
+
 # If you use Poetry/pyproject, replace the above with:
 # COPY pyproject.toml poetry.lock ./
 # RUN pip install "poetry>=1.8.0"

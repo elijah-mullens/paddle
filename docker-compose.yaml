@@ -8,9 +8,10 @@ services:
       dockerfile: docker/Dockerfile
       args:
         UBUNTU_VER: "22.04"
+        CUDA_VER: "12.9.1"
         PYHARP_VER: "v1.8.8"
-        KINTERA_VER: "v1.3.1"
-        SNAPY_VER: "v1.3.2"
+        KINTERA_VER: "v1.3.2"
+        SNAPY_VER: "v1.3.5"
     environment:
       - USERNAME=${USER}
       - USER_UID=${USER_UID}
