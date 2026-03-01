@@ -1,8 +1,8 @@
 netcdf4
 ninja
 numpy
-torch==2.7.1
 paddle
 pre-commit
 ray
 scipy
+torch
