@@ -1,0 +1,7 @@
+These repositories will store paddle-compatible versions of the codes in the UM directories. 
+
+These will not have detailed tutorials, but will have some readme explaining specific 
+details that need to be considered when thinking about these planets (that deviate from
+what we have shown in the other tutorials).
+
+Perhaps also sort things based on science question/simulation type (box vs global)

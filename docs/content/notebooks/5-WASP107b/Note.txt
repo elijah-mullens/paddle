@@ -1,0 +1,6 @@
+Will store tutorials that follow PADDLE publications. 
+
+WASP 107b is a 700K exoplanet with observed features that benefit from dynamical simulations 
+- Limb Asymmetries 
+- Silicate clouds at mbar pressures (form at bar pressures)
+- Chemical quenching
