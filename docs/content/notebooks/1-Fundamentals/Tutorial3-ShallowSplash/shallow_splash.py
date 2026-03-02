@@ -1,6 +1,6 @@
 import torch
-import time
 import numpy as np
+import os 
 from snapy.distributed import get_rank, get_layout
 from snapy.coord import get_cs_face_name, cs_ab_to_lonlat
 from snapy import MeshBlockOptions, MeshBlock
@@ -12,7 +12,10 @@ radius = 5.0e5
 
 # set hydrodynamic options
 op = MeshBlockOptions.from_yaml("shallow_splash.yaml", verbose=False)
-op.output_dir("/data")
+output_directory = "./splash_results"
+os.makedirs(output_directory, exist_ok = True)
+
+op.output_dir(output_directory)
 block = MeshBlock(op)
 
 # use cuda if available
@@ -58,7 +61,6 @@ block_vars["hydro_w"] = w
 block_vars, current_time = block.initialize(block_vars)
 
 # integration
-start_time = time.time()
 block.make_outputs(block_vars, current_time)
 
 while not block.intg.stop(block.inc_cycle(), current_time):
