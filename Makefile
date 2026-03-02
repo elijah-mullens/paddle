@@ -6,6 +6,8 @@ GITCREDENTIALS := $${HOME}/.git-credentials
 DATE_STRING := $(shell date "+%Y-%m-%d")
 JOB := canoe$(date +%Y%m%d_%H%M%S)
 HOST := $${HOSTNAME}
+CUDA_VER := 11.8
+UBUNTU_VER := 22.04
 
 .PHONY: help env up down ps start build deploy finish log status mint upload node resource
 
@@ -85,7 +87,7 @@ status: ## Show the job status
 
 mint: ## Mint the current environment to docker hub
 	docker exec canoe-dev-1 bash -lc 'rm -f /etc/git-credentials /root/.git-credentials /home/*/.git-credentials 2>/dev/null || true'
-	docker tag canoe:latest docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
+	docker tag canoe:latest docker.io/luminoctum/ubuntu$(UBUNTU_VER)-cuda$(CUDA_VER)-py3.10-canoe:${DATE_STRING}
 
 save: ## Save a temporary version
 	docker save canoe:latest | gzip > ${HOME}/data/canoe_tmp.tar.gz
@@ -95,13 +97,13 @@ load: ## Load a temporary version
 
 upload: ## Upload the minted image to docker hub
 	# Refuse to push if the image still contains git credential files
-	docker run --rm docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING} sh -c '\
+	docker run --rm docker.io/luminoctum/ubuntu$(UBUNTU_VER)-cuda$(CUDA_VER)-py3.10-canoe:${DATE_STRING} sh -c '\
 		if ls /home/*/.git-credentials >/dev/null 2>&1; then \
 			echo "Refusing to push image: git credential files detected inside the image." >&2; \
 			exit 1; \
 		fi \
 	'
-	docker push docker.io/luminoctum/ubuntu22.04-cuda12.9-py3.10-canoe:${DATE_STRING}
+	docker push docker.io/luminoctum/ubuntu$(UBUNTU_VER)-cuda$(CUDA_VER)-py3.10-canoe:${DATE_STRING}
 
 node: ## Show nodes in cluster
 	docker node ls

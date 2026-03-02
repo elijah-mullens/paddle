@@ -1,7 +1,6 @@
 netcdf4
 ninja
 numpy
-paddle
 pre-commit
 ray
 scipy

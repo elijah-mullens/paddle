@@ -9,9 +9,11 @@ services:
       args:
         UBUNTU_VER: "22.04"
         CUDA_VER: "12.9.1"
+        TORCH_VER: "2.7.1"
+        PYDISORT_VER: "v1.5.0"
         PYHARP_VER: "v1.9.4"
-        KINTERA_VER: "v1.3.2"
-        SNAPY_VER: "v1.3.5"
+        KINTERA_VER: "v1.3.4"
+        SNAPY_VER: "v1.3.6"
     environment:
       - USERNAME=${USER}
       - USER_UID=${USER_UID}

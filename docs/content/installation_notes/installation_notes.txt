@@ -40,4 +40,4 @@ Installation instructions
 Docker Instructions
 
 (need to add some dependencies here, like matplotlib, PyYAML, nc, etc)
-Correlate things to stable version of snapy, canoe, kintera, etc 
+Correlate things to stable version of snapy, canoe, kintera, etc

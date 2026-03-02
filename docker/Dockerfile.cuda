@@ -7,9 +7,11 @@ ARG UBUNTU_VER=22.04
 ############################
 FROM nvidia/cuda:${CUDA_VER}-devel-ubuntu${UBUNTU_VER} AS base
 
-ARG PYHARP_VER=v1.8.8
-ARG KINTERA_VER=v1.3.1
-ARG SNAPY_VER=v1.3.1
+ARG TORCH_VER=2.10.0
+ARG PYDISORT_VER=v1.6.1
+ARG PYHARP_VER=v1.10.2
+ARG KINTERA_VER=v1.4.0
+ARG SNAPY_VER=v1.4.1
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC
@@ -31,7 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libnetcdf-dev nco ncview \
       && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get install libnccl2 libnccl-dev
+#RUN apt-get install libnccl2 libnccl-dev
 
 # Make fd available as `fd` (Ubuntu calls it fdfind)
 RUN update-alternatives --install /usr/bin/fd fd /usr/bin/fdfind 50
@@ -90,10 +92,24 @@ RUN pip install --upgrade pip setuptools wheel build
 ############################
 FROM base AS wheels
 WORKDIR /tmp/wheels
+ARG CUDA_VER
+
 # If you use requirements.txt:
 COPY docker/requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip wheel -r requirements.txt -w /tmp/wheelhouse
+
+# Install a specific version of PyTorch to ensure CUDA compatibility and cache its wheel
+# Index urls based on CUDA_VER:
+# 11.8: https://download.pytorch.org/whl/cu121
+# 12.6: https://download.pytorch.org/whl/cu126
+# 12.8: https://download.pytorch.org/whl/cu128
+RUN --mount=type=cache,target=/root/.cache/pip \
+    CUDA_SHORT="${CUDA_VER%.*}" && \
+    CUDA_TAG="$(printf '%s' "$CUDA_SHORT" | tr -d '.')" && \
+    PIP_INDEX_URL="https://download.pytorch.org/whl/cu${CUDA_TAG}" && \
+    pip wheel "torch==${TORCH_VER}" -w /tmp/wheelhouse --index-url \
+    ${PIP_INDEX_URL}
 
 # If you use Poetry/pyproject, replace the above with:
 # COPY pyproject.toml poetry.lock ./
@@ -119,15 +135,38 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-index --find-links=/tmp/wheelhouse -r /workspace/docker/requirements.txt \
  || pip install -r /workspace/docker/requirements.txt
 
+# Install torch from wheel
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-index --find-links=/tmp/wheelhouse "torch==${TORCH_VER}" \
+ || pip install "torch==${TORCH_VER}"
+
 # (Optional) CUDA env defaults for many toolchains
 ENV TORCH_CUDA_ARCH_LIST="8.6;8.9;9.0+PTX"  \
     CUDA_CACHE_MAXSIZE=2147483647
 
 ############################
+# Install pydisort
+############################
+WORKDIR /workspace
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/root/.cache/ccache \
+    set -eu pipefail; \
+    if [ ! -d "pydisort/.git" ]; then \
+      rm -rf pydisort; \
+      git clone --filter=blob:none --depth 1 --no-single-branch https://github.com/zoeyzyhu/pydisort/ pydisort; \
+    fi; \
+    cd pydisort; \
+    git fetch --force --tags --prune --depth 1; \
+    git checkout -f "${PYDISORT_VER}"; \
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release; \
+    cmake --build build --parallel "$(nproc)"; \
+    python -m pip install --no-cache-dir --no-deps --no-build-isolation .
+
+############################
 # Install pyharp
 ############################
 WORKDIR /workspace
-ARG PYHARP_VER
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/ccache \
@@ -141,13 +180,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     git checkout -f "${PYHARP_VER}"; \
     cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
     cmake --build build --parallel "$(nproc)"; \
-    python -m pip install --no-cache-dir .
+    python -m pip install --no-cache-dir --no-deps --no-build-isolation .
 
 ############################
 # Install kintera
 ############################
 WORKDIR /workspace
-ARG KINTERA_VER
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/ccache \
@@ -161,13 +199,12 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     git checkout -f "${KINTERA_VER}"; \
     cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
     cmake --build build --parallel "$(nproc)"; \
-    python -m pip install --no-cache-dir .
+    python -m pip install --no-cache-dir --no-deps --no-build-isolation .
 
 ############################
 # Install snapy
 ############################
 WORKDIR /workspace
-ARG SNAPY_VER
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/ccache \
@@ -181,7 +218,15 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     git checkout -f "${SNAPY_VER}"; \
     cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
     cmake --build build --parallel "$(nproc)"; \
-    python -m pip install --no-cache-dir .
+    python -m pip install --no-cache-dir --no-deps --no-build-isolation .
+
+############################
+# Install paddle
+############################
+WORKDIR /workspace
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip wheel paddle -w /tmp/wheelhouse --no-deps
 
 ############################
 # Final setup
