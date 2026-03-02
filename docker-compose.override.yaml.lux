@@ -1,0 +1,8 @@
+services:
+  dev:
+    image: canoe
+    build:
+      dockerfile: docker/Dockerfile.cuda
+      args:
+        CUDA_VER: "11.8.0"
+    gpus: all

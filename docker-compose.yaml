@@ -12,15 +12,12 @@ services:
         TORCH_VER: "2.7.1"
         PYDISORT_VER: "v1.5.0"
         PYHARP_VER: "v1.9.4"
-        KINTERA_VER: "v1.3.2"
-        SNAPY_VER: "v1.3.5"
-        PADDLE_VER: "v1.2.10"
+        KINTERA_VER: "v1.3.4"
+        SNAPY_VER: "v1.3.6"
     environment:
       - USERNAME=${USER}
       - USER_UID=${USER_UID}
       - USER_GID=${USER_GID}
-      - UBUNTU_VER=${UBUNTU_VER}
-      - CUDA_VER=${CUDA_VER}
     volumes:
       - ..:/work
       - ${GITCONFIG}:/etc/gitconfig

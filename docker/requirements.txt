@@ -2,3 +2,5 @@ netcdf4
 ninja
 numpy
 pre-commit
+ray
+scipy
