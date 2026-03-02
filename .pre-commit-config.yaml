@@ -4,11 +4,8 @@ repos:
     hooks:
       - id: requirements-txt-fixer
       - id: trailing-whitespace
-        exclude: ^(data|patches)/.*$
       - id: end-of-file-fixer
-        exclude: ^(data|patches)/.*$
       - id: check-yaml
-        exclude: ^data/
 
   - repo: https://github.com/psf/black
     rev: 24.10.0  # Use the latest stable version
