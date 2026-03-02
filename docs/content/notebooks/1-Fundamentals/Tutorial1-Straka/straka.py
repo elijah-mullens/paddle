@@ -32,12 +32,6 @@ dT = -15.0
 # zr = 3e3
 # dT = -20
 
-# use cuda if available
-if torch.cuda.is_available():
-    device = torch.device("cuda:0")
-else:
-    device = torch.device("cpu")
-
 # set hydrodynamic options
 op = MeshBlockOptions.from_yaml("straka.yaml")
 
@@ -49,6 +43,12 @@ op.output_dir(output_directory)
 
 # initialize block
 block = MeshBlock(op)
+
+# use cuda if available
+if torch.cuda.is_available() and op.layout().backend() == "nccl":
+    device = torch.device(block.device())
+else:
+    device = torch.device("cpu")
 block.to(device)
 
 # get handles to modules

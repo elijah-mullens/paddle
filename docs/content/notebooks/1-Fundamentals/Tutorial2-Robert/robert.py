@@ -27,12 +27,6 @@ s = 100.0
 a = 50.0
 uniform_bubble = False
 
-# use cuda if available
-if torch.cuda.is_available():
-    device = torch.device("cuda:0")
-else:
-    device = torch.device("cpu")
-
 # set hydrodynamic options
 op = MeshBlockOptions.from_yaml("robert.yaml")
 
@@ -42,6 +36,12 @@ os.makedirs(output_directory, exist_ok=True)
 op.output_dir(output_directory)
 
 block = MeshBlock(op)
+
+# use cuda if available
+if torch.cuda.is_available() and op.layout().backend() == "nccl":
+    device = torch.device(block.device())
+else:
+    device = torch.device("cpu")
 block.to(device)
 
 # get handles to modules
