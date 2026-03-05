@@ -61,7 +61,7 @@ ps: env ## Show container status
 
 start: env ## Open a bash shell inside the 'dev' container as the host user, exit without error
 	@docker compose exec --user $(UID):$(GID) dev \
-		bash -c 'git config --global --add safe.directory /canoe; source /opt/venv/bin/activate; exec bash'
+		bash -c 'git config --global --add safe.directory /canoe; exec bash'
 
 build: env ## Build (or rebuild) the 'dev' container and start it
 	@docker compose up -d --build dev
