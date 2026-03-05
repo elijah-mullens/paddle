@@ -225,8 +225,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 ############################
 WORKDIR /workspace
 
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip wheel paddle -w /tmp/wheelhouse --no-deps
+RUN python -m pip install paddle
 
 ############################
 # Final setup
