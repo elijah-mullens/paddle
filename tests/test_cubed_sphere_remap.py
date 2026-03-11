@@ -14,6 +14,7 @@ from paddle.cubed_sphere_remap import (
     _load_offline_map_matrix,
     infer_mosaic_layout,
     remap_scalar_fields,
+    reorder_faces_to_tempest,
     rotate_vector_faces_to_geographic,
     split_stitched_mosaic,
 )
@@ -59,6 +60,12 @@ def test_rotate_vector_faces_to_geographic_at_face_centers() -> None:
     vel3[0, 0, 0] = 4.0
     east, north, up = rotate_vector_faces_to_geographic(vel1, vel2, vel3, lon_faces, lat_faces)
     assert np.isclose(north[0, 0, 0], 4.0)
+
+
+def test_reorder_faces_to_tempest_matches_verified_face_order() -> None:
+    faces = np.arange(6).reshape(6, 1, 1)
+    reordered = reorder_faces_to_tempest(faces)
+    np.testing.assert_array_equal(reordered[:, 0, 0], np.array([0, 1, 2, 4, 5, 3]))
 
 
 def test_load_offline_map_matrix_supports_standard_weight_file(tmp_path: Path) -> None:

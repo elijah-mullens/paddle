@@ -15,6 +15,7 @@ from scipy import sparse
 
 FACE_NAMES = ("+X", "+Y", "-X", "+Z", "-Y", "-Z")
 MOSAIC_FACE_GRID = ((0, 1, 2), (3, 4, 5))
+SNAP_TO_TEMPEST_FACE_ORDER = (0, 1, 2, 4, 5, 3)
 
 # Snapy stores global Cartesian components in the order (Z, X, Y).
 _CS_L2G_VEL = (
@@ -85,6 +86,11 @@ def split_stitched_mosaic(array: np.ndarray, layout: MosaicLayout) -> np.ndarray
 def flatten_faces(face_data: np.ndarray) -> np.ndarray:
     """Flatten face-major data into Tempest face-major row-major ordering."""
     return face_data.reshape(*face_data.shape[:-3], -1)
+
+
+def reorder_faces_to_tempest(face_data: np.ndarray) -> np.ndarray:
+    """Reorder Snapy's face order (+X,+Y,-X,+Z,-Y,-Z) to Tempest's order."""
+    return np.take(face_data, SNAP_TO_TEMPEST_FACE_ORDER, axis=-3)
 
 
 def lonlat_to_face_ab(face: int, lon: np.ndarray, lat: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -455,9 +461,9 @@ def remap_vector_fields(
                 north[t_index, x1_index] = north_faces
                 up[t_index, x1_index] = up_faces
 
-        east_flat = flatten_faces(east)
-        north_flat = flatten_faces(north)
-        up_flat = flatten_faces(up)
+        east_flat = flatten_faces(reorder_faces_to_tempest(east))
+        north_flat = flatten_faces(reorder_faces_to_tempest(north))
+        up_flat = flatten_faces(reorder_faces_to_tempest(up))
 
         remapped[east_name] = remap_scalar_fields(
             {east_name: east_flat},
@@ -610,7 +616,7 @@ def remap_cubed_sphere_files(
             ds, var_name = var_sources[name]
             data = np.asarray(ds.variables[var_name][:], dtype=np.float64)
             faces = split_stitched_mosaic(data, layout)
-            scalar_source_arrays[name] = flatten_faces(faces)
+            scalar_source_arrays[name] = flatten_faces(reorder_faces_to_tempest(faces))
 
         remapped_scalars = remap_scalar_fields(scalar_source_arrays, weights, nlat, nlon)
         remapped_vectors = remap_vector_fields(
