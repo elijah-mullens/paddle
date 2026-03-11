@@ -129,6 +129,10 @@ Follow the steps below to set up your development environment.
 `paddle` can remap Snapy stitched cubed-sphere NetCDF outputs to a rectilinear
 lat-lon grid with TempestRemap-generated offline weights.
 
+See [docs/README_REMAP.md](docs/README_REMAP.md) for a step-by-step remapping
+guide, including the real `workspace/data` example files, 0.5 degree output,
+variable selection, and TempestRemap cache usage.
+
 Example:
 
 ```bash
