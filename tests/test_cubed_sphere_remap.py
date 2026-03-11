@@ -49,17 +49,23 @@ def test_rotate_vector_faces_to_geographic_at_face_centers() -> None:
     vel3 = np.zeros((6, 1, 1))
 
     vel1[0, 0, 0] = 2.0
-    east, north, up = rotate_vector_faces_to_geographic(vel1, vel2, vel3, lon_faces, lat_faces)
+    east, north, up = rotate_vector_faces_to_geographic(
+        vel1, vel2, vel3, lon_faces, lat_faces
+    )
     assert np.isclose(up[0, 0, 0], 2.0)
 
     vel1[:] = 0.0
     vel2[0, 0, 0] = 3.0
-    east, north, up = rotate_vector_faces_to_geographic(vel1, vel2, vel3, lon_faces, lat_faces)
+    east, north, up = rotate_vector_faces_to_geographic(
+        vel1, vel2, vel3, lon_faces, lat_faces
+    )
     assert np.isclose(east[0, 0, 0], 3.0)
 
     vel2[:] = 0.0
     vel3[0, 0, 0] = 4.0
-    east, north, up = rotate_vector_faces_to_geographic(vel1, vel2, vel3, lon_faces, lat_faces)
+    east, north, up = rotate_vector_faces_to_geographic(
+        vel1, vel2, vel3, lon_faces, lat_faces
+    )
     assert np.isclose(north[0, 0, 0], 4.0)
 
 
@@ -95,7 +101,9 @@ def test_remap_scalar_fields_reshapes_back_to_lat_lon() -> None:
     np.testing.assert_allclose(remapped["rho"], np.array([[[[1.0, 2.0], [3.0, 4.0]]]]))
 
 
-def test_generate_tempest_map_builds_expected_commands(tmp_path: Path, monkeypatch) -> None:
+def test_generate_tempest_map_builds_expected_commands(
+    tmp_path: Path, monkeypatch
+) -> None:
     calls: list[list[str]] = []
 
     def fake_run(cmd, cwd=None, check=True):

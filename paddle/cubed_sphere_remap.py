@@ -93,7 +93,9 @@ def reorder_faces_to_tempest(face_data: np.ndarray) -> np.ndarray:
     return np.take(face_data, SNAP_TO_TEMPEST_FACE_ORDER, axis=-3)
 
 
-def lonlat_to_face_ab(face: int, lon: np.ndarray, lat: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def lonlat_to_face_ab(
+    face: int, lon: np.ndarray, lat: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     xx = np.cos(lon) * np.cos(lat)
     yy = np.sin(lon) * np.cos(lat)
     zz = np.sin(lat)
@@ -200,7 +202,9 @@ def _which(program: str) -> str | None:
     return shutil.which(program)
 
 
-def ensure_tempestremap_available(tempest_bin_dir: str | os.PathLike[str] | None = None) -> TempestPaths:
+def ensure_tempestremap_available(
+    tempest_bin_dir: str | os.PathLike[str] | None = None,
+) -> TempestPaths:
     def resolve(name: str) -> str:
         if tempest_bin_dir is not None:
             candidate = Path(tempest_bin_dir) / name
@@ -384,7 +388,9 @@ def _load_inputs(
                 if name in _COORDINATE_VARS:
                     continue
                 if name in var_sources:
-                    raise ValueError(f"Variable '{name}' appears in multiple input files")
+                    raise ValueError(
+                        f"Variable '{name}' appears in multiple input files"
+                    )
                 var_sources[name] = (ds, name)
         return datasets, var_sources
     except Exception:
@@ -393,7 +399,9 @@ def _load_inputs(
         raise
 
 
-def _read_coordinate_faces(ds: Dataset, layout: MosaicLayout) -> tuple[np.ndarray, np.ndarray]:
+def _read_coordinate_faces(
+    ds: Dataset, layout: MosaicLayout
+) -> tuple[np.ndarray, np.ndarray]:
     lon = np.asarray(ds.variables["lon"][0], dtype=np.float64)
     lat = np.asarray(ds.variables["lat"][0], dtype=np.float64)
     return split_stitched_mosaic(lon, layout), split_stitched_mosaic(lat, layout)
@@ -441,7 +449,9 @@ def remap_vector_fields(
         vel3 = np.asarray(ds3.variables[vel3_name][:], dtype=np.float64)
 
         time_size, x1_size = vel1.shape[:2]
-        east = np.empty((time_size, x1_size, 6, layout.face_ny, layout.face_nx), dtype=np.float64)
+        east = np.empty(
+            (time_size, x1_size, 6, layout.face_ny, layout.face_nx), dtype=np.float64
+        )
         north = np.empty_like(east)
         up = np.empty_like(east)
 
@@ -595,7 +605,9 @@ def _write_output_file(
         for name, data in {**remapped_scalars, **remapped_vectors}.items():
             var = nc.createVariable(name, "f4", ("time", "altitude", "lat", "lon"))
             if name in var_sources:
-                _copy_variable_attrs(var_sources[name][0].variables[var_sources[name][1]], var)
+                _copy_variable_attrs(
+                    var_sources[name][0].variables[var_sources[name][1]], var
+                )
             else:
                 _apply_vector_attrs(name, vector_triplets, var_sources, var)
             var[:] = data.astype(np.float32)
@@ -615,7 +627,9 @@ def _apply_vector_attrs(
     dst_var,
 ) -> None:
     for vel1_name, vel2_name, vel3_name in vector_triplets:
-        east_name, north_name, up_name = _vector_output_names(vel1_name, vel2_name, vel3_name)
+        east_name, north_name, up_name = _vector_output_names(
+            vel1_name, vel2_name, vel3_name
+        )
         if output_name == east_name:
             src = var_sources[vel2_name][0].variables[vel2_name]
             _copy_variable_attrs(src, dst_var)
@@ -664,7 +678,9 @@ def remap_cubed_sphere_files(
         )
         lon_faces, lat_faces = _read_coordinate_faces(coordinate_ds, layout)
 
-        vector_triplets_norm = _normalize_vector_triplets(vector_triplets, set(var_sources))
+        vector_triplets_norm = _normalize_vector_triplets(
+            vector_triplets, set(var_sources)
+        )
         if scalar_vars is None:
             scalar_vars_norm = _default_scalar_vars(var_sources, vector_triplets_norm)
         else:
@@ -696,7 +712,9 @@ def remap_cubed_sphere_files(
             faces = split_stitched_mosaic(data, layout)
             scalar_source_arrays[name] = flatten_faces(reorder_faces_to_tempest(faces))
 
-        remapped_scalars = remap_scalar_fields(scalar_source_arrays, weights, nlat, nlon)
+        remapped_scalars = remap_scalar_fields(
+            scalar_source_arrays, weights, nlat, nlon
+        )
         remapped_vectors = remap_vector_fields(
             vector_triplets_norm,
             var_sources,
@@ -730,8 +748,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("inputs", nargs="+", help="Input Snapy NetCDF files")
     parser.add_argument("output", help="Output lat-lon NetCDF file")
-    parser.add_argument("--nlat", type=int, required=True, help="Number of latitude cells")
-    parser.add_argument("--nlon", type=int, required=True, help="Number of longitude cells")
+    parser.add_argument(
+        "--nlat", type=int, required=True, help="Number of latitude cells"
+    )
+    parser.add_argument(
+        "--nlon", type=int, required=True, help="Number of longitude cells"
+    )
     parser.add_argument(
         "--scalar",
         action="append",
