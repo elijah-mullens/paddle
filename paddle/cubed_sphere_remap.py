@@ -528,10 +528,11 @@ def _write_output_file(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with Dataset(output_path, "w") as nc:
+        nc.Conventions = "CF-1.10"
         nc.createDimension("time", time_vals.shape[0])
-        nc.createDimension("x1", x1_vals.shape[0])
+        nc.createDimension("altitude", x1_vals.shape[0])
         if x1f_vals is not None:
-            nc.createDimension("x1f", x1f_vals.shape[0])
+            nc.createDimension("bnds", 2)
         nc.createDimension("lat", nlat)
         nc.createDimension("lon", nlon)
 
@@ -539,27 +540,52 @@ def _write_output_file(
             nc.setncattr(attr, template_ds.getncattr(attr))
 
         time_var = nc.createVariable("time", "f4", ("time",))
+        time_var.standard_name = "time"
+        time_var.long_name = "time"
+        time_var.axis = "T"
+        if "time" in template_ds.variables:
+            src_time = template_ds.variables["time"]
+            if "units" in src_time.ncattrs():
+                time_var.units = src_time.units
         time_var[:] = time_vals
-        x1_var = nc.createVariable("x1", "f4", ("x1",))
-        x1_var.long_name = "altitude"
-        x1_var.standard_name = "altitude"
-        x1_var.axis = "Z"
-        x1_var[:] = x1_vals
+
+        altitude_var = nc.createVariable("altitude", "f4", ("altitude",))
+        altitude_var.long_name = "altitude"
+        altitude_var.standard_name = "altitude"
+        altitude_var.axis = "Z"
+        altitude_var.positive = "up"
+        if "x1" in template_ds.variables and "units" in template_ds.variables["x1"].ncattrs():
+            altitude_var.units = template_ds.variables["x1"].units
+        else:
+            altitude_var.units = "m"
         if x1f_vals is not None:
-            x1f_var = nc.createVariable("x1f", "f4", ("x1f",))
-            x1f_var.long_name = "altitude_at_cell_faces"
-            x1f_var.axis = "Z"
-            x1f_var[:] = x1f_vals
+            altitude_var.bounds = "altitude_bounds"
+        altitude_var[:] = x1_vals
+
+        if x1f_vals is not None:
+            altitude_bounds_var = nc.createVariable(
+                "altitude_bounds",
+                "f4",
+                ("altitude", "bnds"),
+            )
+            altitude_bounds_var[:] = np.stack([x1f_vals[:-1], x1f_vals[1:]], axis=1)
 
         lat_var = nc.createVariable("lat", "f4", ("lat",))
         lat_var.units = "degrees_north"
+        lat_var.standard_name = "latitude"
+        lat_var.long_name = "latitude"
+        lat_var.axis = "Y"
         lat_var[:] = lat
         lon_var = nc.createVariable("lon", "f4", ("lon",))
         lon_var.units = "degrees_east"
+        lon_var.standard_name = "longitude"
+        lon_var.long_name = "longitude"
+        lon_var.axis = "X"
         lon_var[:] = lon
 
         for name, data in {**remapped_scalars, **remapped_vectors}.items():
-            var = nc.createVariable(name, "f4", ("time", "x1", "lat", "lon"))
+            var = nc.createVariable(name, "f4", ("time", "altitude", "lat", "lon"))
+            var.coordinates = "time altitude lat lon"
             var[:] = data.astype(np.float32)
 
 
