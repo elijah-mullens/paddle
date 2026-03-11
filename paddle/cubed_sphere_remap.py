@@ -500,7 +500,7 @@ def _vector_output_names(
 
 
 def _build_target_coordinates(nlat: int, nlon: int) -> tuple[np.ndarray, np.ndarray]:
-    lat_edges = np.linspace(90.0, -90.0, nlat + 1)
+    lat_edges = np.linspace(-90.0, 90.0, nlat + 1)
     lon_edges = np.linspace(0.0, 360.0, nlon + 1)
     lat = 0.5 * (lat_edges[:-1] + lat_edges[1:])
     lon = 0.5 * (lon_edges[:-1] + lon_edges[1:])
