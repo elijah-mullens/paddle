@@ -510,6 +510,9 @@ def _build_target_coordinates(nlat: int, nlon: int) -> tuple[np.ndarray, np.ndar
 def _write_output_file(
     output: str | os.PathLike[str],
     template_ds: Dataset,
+    coordinate_ds: Dataset,
+    var_sources: dict[str, tuple[Dataset, str]],
+    vector_triplets: Sequence[tuple[str, str, str]],
     remapped_scalars: dict[str, np.ndarray],
     remapped_vectors: dict[str, np.ndarray],
     nlat: int,
@@ -541,23 +544,23 @@ def _write_output_file(
 
         time_var = nc.createVariable("time", "f4", ("time",))
         time_var.standard_name = "time"
-        time_var.long_name = "time"
         time_var.axis = "T"
         if "time" in template_ds.variables:
             src_time = template_ds.variables["time"]
-            if "units" in src_time.ncattrs():
-                time_var.units = src_time.units
+            _copy_variable_attrs(src_time, time_var)
+        if "long_name" not in time_var.ncattrs():
+            time_var.long_name = "time"
         time_var[:] = time_vals
 
         altitude_var = nc.createVariable("altitude", "f4", ("altitude",))
-        altitude_var.long_name = "altitude"
         altitude_var.standard_name = "altitude"
         altitude_var.axis = "Z"
         altitude_var.positive = "up"
-        if "x1" in template_ds.variables and "units" in template_ds.variables["x1"].ncattrs():
-            altitude_var.units = template_ds.variables["x1"].units
-        else:
+        if "x1" in template_ds.variables:
+            _copy_variable_attrs(template_ds.variables["x1"], altitude_var)
+        if "units" not in altitude_var.ncattrs():
             altitude_var.units = "m"
+        altitude_var.long_name = "altitude"
         if x1f_vals is not None:
             altitude_var.bounds = "altitude_bounds"
         altitude_var[:] = x1_vals
@@ -568,25 +571,70 @@ def _write_output_file(
                 "f4",
                 ("altitude", "bnds"),
             )
+            if "x1f" in template_ds.variables:
+                _copy_variable_attrs(template_ds.variables["x1f"], altitude_bounds_var)
             altitude_bounds_var[:] = np.stack([x1f_vals[:-1], x1f_vals[1:]], axis=1)
 
         lat_var = nc.createVariable("lat", "f4", ("lat",))
-        lat_var.units = "degrees_north"
         lat_var.standard_name = "latitude"
-        lat_var.long_name = "latitude"
         lat_var.axis = "Y"
+        if "lat" in coordinate_ds.variables:
+            _copy_variable_attrs(coordinate_ds.variables["lat"], lat_var)
+        lat_var.units = "degrees_north"
+        lat_var.long_name = "latitude"
         lat_var[:] = lat
         lon_var = nc.createVariable("lon", "f4", ("lon",))
-        lon_var.units = "degrees_east"
         lon_var.standard_name = "longitude"
-        lon_var.long_name = "longitude"
         lon_var.axis = "X"
+        if "lon" in coordinate_ds.variables:
+            _copy_variable_attrs(coordinate_ds.variables["lon"], lon_var)
+        lon_var.units = "degrees_east"
+        lon_var.long_name = "longitude"
         lon_var[:] = lon
 
         for name, data in {**remapped_scalars, **remapped_vectors}.items():
             var = nc.createVariable(name, "f4", ("time", "altitude", "lat", "lon"))
             var.coordinates = "time altitude lat lon"
+            if name in var_sources:
+                _copy_variable_attrs(var_sources[name][0].variables[var_sources[name][1]], var)
+            else:
+                _apply_vector_attrs(name, vector_triplets, var_sources, var)
             var[:] = data.astype(np.float32)
+
+
+def _copy_variable_attrs(src_var, dst_var) -> None:
+    for attr_name in src_var.ncattrs():
+        if attr_name == "_FillValue":
+            continue
+        dst_var.setncattr(attr_name, src_var.getncattr(attr_name))
+
+
+def _apply_vector_attrs(
+    output_name: str,
+    vector_triplets: Sequence[tuple[str, str, str]],
+    var_sources: dict[str, tuple[Dataset, str]],
+    dst_var,
+) -> None:
+    for vel1_name, vel2_name, vel3_name in vector_triplets:
+        east_name, north_name, up_name = _vector_output_names(vel1_name, vel2_name, vel3_name)
+        if output_name == east_name:
+            src = var_sources[vel2_name][0].variables[vel2_name]
+            _copy_variable_attrs(src, dst_var)
+            if "long_name" in dst_var.ncattrs():
+                dst_var.long_name = "eastward velocity"
+            return
+        if output_name == north_name:
+            src = var_sources[vel3_name][0].variables[vel3_name]
+            _copy_variable_attrs(src, dst_var)
+            if "long_name" in dst_var.ncattrs():
+                dst_var.long_name = "northward velocity"
+            return
+        if output_name == up_name:
+            src = var_sources[vel1_name][0].variables[vel1_name]
+            _copy_variable_attrs(src, dst_var)
+            if "long_name" in dst_var.ncattrs():
+                dst_var.long_name = "upward velocity"
+            return
 
 
 def remap_cubed_sphere_files(
@@ -660,7 +708,17 @@ def remap_cubed_sphere_files(
             nlat,
             nlon,
         )
-        _write_output_file(output, template_ds, remapped_scalars, remapped_vectors, nlat, nlon)
+        _write_output_file(
+            output,
+            template_ds,
+            coordinate_ds,
+            var_sources,
+            vector_triplets_norm,
+            remapped_scalars,
+            remapped_vectors,
+            nlat,
+            nlon,
+        )
         return Path(output)
     finally:
         for ds in datasets:
