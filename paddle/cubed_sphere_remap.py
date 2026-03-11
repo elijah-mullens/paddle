@@ -541,9 +541,14 @@ def _write_output_file(
         time_var = nc.createVariable("time", "f4", ("time",))
         time_var[:] = time_vals
         x1_var = nc.createVariable("x1", "f4", ("x1",))
+        x1_var.long_name = "altitude"
+        x1_var.standard_name = "altitude"
+        x1_var.axis = "Z"
         x1_var[:] = x1_vals
         if x1f_vals is not None:
             x1f_var = nc.createVariable("x1f", "f4", ("x1f",))
+            x1f_var.long_name = "altitude_at_cell_faces"
+            x1f_var.axis = "Z"
             x1f_var[:] = x1f_vals
 
         lat_var = nc.createVariable("lat", "f4", ("lat",))
