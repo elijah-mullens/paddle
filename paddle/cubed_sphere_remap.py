@@ -594,7 +594,6 @@ def _write_output_file(
 
         for name, data in {**remapped_scalars, **remapped_vectors}.items():
             var = nc.createVariable(name, "f4", ("time", "altitude", "lat", "lon"))
-            var.coordinates = "time altitude lat lon"
             if name in var_sources:
                 _copy_variable_attrs(var_sources[name][0].variables[var_sources[name][1]], var)
             else:

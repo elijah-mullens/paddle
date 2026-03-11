@@ -10,6 +10,7 @@ from scipy import sparse
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from paddle.cubed_sphere_remap import (
+    _write_output_file,
     _generate_tempest_map,
     _load_offline_map_matrix,
     infer_mosaic_layout,
@@ -125,3 +126,47 @@ def test_generate_tempest_map_builds_expected_commands(tmp_path: Path, monkeypat
     assert calls[1][:3] == ["GenerateRLLMesh", "--lat", "8"]
     assert calls[2][0] == "GenerateOverlapMesh"
     assert calls[3][0] == "GenerateOfflineMap"
+
+
+def test_write_output_file_omits_coordinates_attribute(tmp_path: Path) -> None:
+    template_path = tmp_path / "template.nc"
+    output_path = tmp_path / "out.nc"
+
+    with Dataset(template_path, "w") as nc:
+        nc.createDimension("time", 1)
+        nc.createDimension("x1", 2)
+        nc.createDimension("x1f", 3)
+        nc.createDimension("x2", 6)
+        nc.createDimension("x3", 4)
+        time = nc.createVariable("time", "f4", ("time",))
+        time.units = "s"
+        time[:] = [0.0]
+        x1 = nc.createVariable("x1", "f4", ("x1",))
+        x1.units = "m"
+        x1[:] = [1.0, 2.0]
+        x1f = nc.createVariable("x1f", "f4", ("x1f",))
+        x1f[:] = [0.0, 1.5, 3.0]
+        lon = nc.createVariable("lon", "f4", ("time", "x3", "x2"))
+        lat = nc.createVariable("lat", "f4", ("time", "x3", "x2"))
+        lon[:] = 0.0
+        lat[:] = 0.0
+        rho = nc.createVariable("rho", "f4", ("time", "x1", "x3", "x2"))
+        rho.units = "kg/m^3"
+        rho.long_name = "density"
+        rho[:] = 1.0
+
+    with Dataset(template_path) as template_ds, Dataset(template_path) as coordinate_ds:
+        _write_output_file(
+            output_path,
+            template_ds,
+            coordinate_ds,
+            {"rho": (template_ds, "rho")},
+            (),
+            {"rho": np.ones((1, 2, 2, 2), dtype=np.float64)},
+            {},
+            2,
+            2,
+        )
+
+    with Dataset(output_path) as out_nc:
+        assert "coordinates" not in out_nc.variables["rho"].ncattrs()
