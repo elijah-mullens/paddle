@@ -221,3 +221,7 @@ docker-compose.override.yaml
 
 # pt file
 *.pt
+
+# agents
+AGENTS.md
+CLAUDE.md
