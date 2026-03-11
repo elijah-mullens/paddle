@@ -33,7 +33,8 @@ classifiers = [
 dependencies = [
   "torch>=2.7.0",
   "snapy>=1.3.5",
-  "scipy"
+  "scipy",
+  "netCDF4"
 ]
 
 [project.optional-dependencies]
@@ -48,3 +49,4 @@ Issues = "https://github.com/elijah-mullens/paddle/issues"
 
 [project.scripts]
 paddle = "paddle.__main__:main"
+paddle-cs-remap = "paddle.cubed_sphere_remap:main"

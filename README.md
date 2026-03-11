@@ -124,6 +124,52 @@ Follow the steps below to set up your development environment.
    pre-commit install
    ```
 
+## Cubed-Sphere Remapping
+
+`paddle` can remap Snapy stitched cubed-sphere NetCDF outputs to a rectilinear
+lat-lon grid with TempestRemap-generated offline weights.
+
+See [docs/README_REMAP.md](docs/README_REMAP.md) for a step-by-step remapping
+guide, including the real `workspace/data` example files, 0.5 degree output,
+variable selection, and TempestRemap cache usage.
+
+Example:
+
+```bash
+paddle-cs-remap \
+  /home/chengcli/scix/workspace/data/sub_neptune_tidallock.out1.00290.nc \
+  /home/chengcli/scix/workspace/data/sub_neptune_tidallock.out2.00290.nc \
+  remapped.nc \
+  --nlat 181 \
+  --nlon 360
+```
+
+The remapper treats Snapy outputs as the 2D stitched 3x2 cubed-sphere mosaic
+written by Snapy's NetCDF output code. Scalar fields are remapped directly.
+`vel1, vel2, vel3` are rotated to geographic `vel_east, vel_north, vel_up`
+before remapping.
+
+### Install TempestRemap
+
+Preferred option:
+
+```bash
+conda install -c conda-forge tempest-remap
+```
+
+Helper script:
+
+```bash
+./scripts/install_tempestremap.sh conda
+```
+
+Source-build fallback:
+
+```bash
+./scripts/install_tempestremap.sh source "$HOME/.local/tempestremap"
+export PATH="$HOME/.local/tempestremap/bin:$PATH"
+```
+
 ## Troubleshooting
 
 1. If you have Docker installed but do not have Docker Compose, remove your current Docker installation, which could be docker or docker.io, and re-install it following the guide provided in the [Develop with Docker](#develop-with-docker) section above.

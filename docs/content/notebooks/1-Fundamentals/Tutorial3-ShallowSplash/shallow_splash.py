@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-import os 
+import os
 from snapy.distributed import get_rank, get_layout
 from snapy.coord import get_cs_face_name, cs_ab_to_lonlat
 from snapy import MeshBlockOptions, MeshBlock
@@ -13,7 +13,7 @@ radius = 5.0e5
 # set hydrodynamic options
 op = MeshBlockOptions.from_yaml("shallow_splash.yaml", verbose=False)
 output_directory = "./splash_results"
-os.makedirs(output_directory, exist_ok = True)
+os.makedirs(output_directory, exist_ok=True)
 
 op.output_dir(output_directory)
 block = MeshBlock(op)
