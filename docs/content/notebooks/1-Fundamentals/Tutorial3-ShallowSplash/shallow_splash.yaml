@@ -20,6 +20,7 @@ distribute:
   layout: cubed-sphere
   nb2: 1
   nb3: 1
+  blocks_per_process: 1
   verbose: false
 
 dynamics:
@@ -53,7 +54,11 @@ integration:
 outputs:
   - type: netcdf
     variables: [prim]
-    dt: 1.E4
+    dt: 1.E5
+
+forcing:
+  coriolis:
+    omega1: 0.e-4
 
 problem:
   phi: 500.
