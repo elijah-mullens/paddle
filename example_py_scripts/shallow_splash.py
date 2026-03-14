@@ -2,12 +2,12 @@ import argparse
 import os
 
 import numpy as np
-import snapy
 import torch
 import torch.distributed as dist
 import torch.distributed.distributed_c10d as dist_c10d
 import yaml
-from snapy import Mesh, MeshBlockOptions, MeshOptions
+import snapy
+from snapy import Mesh, MeshOptions
 from snapy import kIDN, kIV2, kIV3
 from snapy.coord import cs_ab_to_lonlat, get_cs_face_name
 
@@ -33,20 +33,6 @@ def init_dist(backend: str) -> torch.device:
     if backend == "nccl":
         return torch.device(f"cuda:{local_rank}")
     return torch.device("cpu")
-
-
-def build_mesh(input_file: str, output_dir: str) -> tuple[Mesh, dict]:
-    with open(input_file, "r", encoding="utf-8") as stream:
-        config = yaml.safe_load(stream)
-
-    block_options = MeshBlockOptions.from_yaml(input_file, verbose=False)
-    block_options.output_dir(output_dir)
-
-    mesh_options = MeshOptions()
-    mesh_options.block(block_options)
-    mesh_options.blocks_per_process(config["distribute"].get("blocks_per_process", 1))
-
-    return Mesh(mesh_options), config
 
 
 def initialize_block(
@@ -92,14 +78,16 @@ def main() -> None:
         config = yaml.safe_load(stream)
 
     device = init_dist(config["distribute"].get("backend", "gloo"))
-    mesh, config = build_mesh(args.input, args.output_dir)
+
+    options = MeshOptions.from_yaml(input_file, verbose=False)
+    mesh = Mesh(options)
     mesh.to(device)
 
     block_vars = [initialize_block(block, config, device) for block in mesh.blocks]
     block_vars, current_time = mesh.initialize(block_vars)
     mesh.make_outputs(block_vars, current_time)
 
-    root = mesh.blocks[0]
+    root = mesh.block(0)
     cycle = 0
     while not root.intg.stop(cycle, current_time):
         cycle += 1
