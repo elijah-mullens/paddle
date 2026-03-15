@@ -79,7 +79,7 @@ def main() -> None:
 
     device = init_dist(config["distribute"].get("backend", "gloo"))
 
-    options = MeshOptions.from_yaml(input_file, verbose=False)
+    options = MeshOptions.from_yaml(args.input, verbose=False)
     mesh = Mesh(options)
     mesh.to(device)
 
@@ -87,16 +87,16 @@ def main() -> None:
     block_vars, current_time = mesh.initialize(block_vars)
     mesh.make_outputs(block_vars, current_time)
 
-    root = mesh.block(0)
+    intg = mesh.module("block0.intg")
     cycle = 0
-    while not root.intg.stop(cycle, current_time):
+    while not intg.stop(cycle, current_time):
         cycle += 1
         mesh.set_cycle(cycle)
 
         dt = mesh.max_time_step(block_vars)
         mesh.print_cycle_info(block_vars, current_time, dt)
 
-        for stage in range(len(root.intg.stages)):
+        for stage in range(len(intg.stages)):
             mesh.forward(block_vars, dt, stage)
 
         err = mesh.check_redo(block_vars)
