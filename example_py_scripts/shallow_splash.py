@@ -20,19 +20,22 @@ def init_dist(backend: str) -> torch.device:
     os.environ.setdefault("LOCAL_RANK", os.environ["RANK"])
 
     local_rank = int(os.environ["LOCAL_RANK"])
-    if backend == "nccl":
+    if backend == "gloo":
+        dist.init_process_group(backend="gloo", init_method="env://")
+        device = torch.device("cpu")
+    elif backend == "nccl":
         if not torch.cuda.is_available():
             raise RuntimeError("NCCL backend requires CUDA")
         torch.cuda.set_device(local_rank)
-
-    if not dist.is_initialized():
-        dist.init_process_group(backend=backend, init_method="env://")
+        device = torch.device(f"cuda:{local_rank}")
+        dist.init_process_group(
+            backend="cpu:gloo,cuda:nccl", device_id=device, init_method="env://"
+        )
+    else:
+        raise ValueError("Unsupported backend")
 
     snapy.distributed.set_process_group(dist_c10d._get_default_group())
-
-    if backend == "nccl":
-        return torch.device(f"cuda:{local_rank}")
-    return torch.device("cpu")
+    return device
 
 
 def initialize_block(
