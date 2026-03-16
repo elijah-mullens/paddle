@@ -53,37 +53,38 @@ species:
     u0_R: -1.2e4
 
 geometry:
-  type: cartesian
+  type: gnomonic-equiangle
 
   bounds:
-    x1min: 0.
-    x1max: 300.e3
-    x2min: 0.
-    x2max: 2400.e3
-    x3min: 0.
-    x3max: 2400.e3
+    x1min: 69911000
+    x1max: 70211000
+    x2min_pi: -0.25
+    x2max_pi: 0.25
+    x3min_pi: -0.25
+    x3max_pi: 0.25
 
   cells:
-    nx1: 100
-    nx2: 100
-    nx3: 100
+    nx1: 24
+    nx2: 16
+    nx3: 16
     nghost: 3
 
 distribute:
-  backend: gloo
-  layout: slab
-  nb2: 2
-  nb3: 2
+  backend: nccl
+  layout: cubed-sphere
+  nb2: 1
+  nb3: 1
+  blocks_per_process: 6
   verbose: false
 
 dynamics:
   equation-of-state:
     type: ideal-moist
-    density-floor:  1.e-10
+    density-floor: 1.e-10
     pressure-floor: 1.e-10
     tracer-floor: 1.e-10
     limiter: true
-    max-iter: 20
+    max-iter: 40
     ftol: 1.e-6
 
   vertical-projection:
@@ -98,43 +99,35 @@ dynamics:
     type: hllc
 
 boundary-condition:
+  internal:
+    solid-density: 1.e3
+    solid-pressure: 1.e9
+    max-iter: 5
+
   external:
     x1-inner: reflecting
     x1-outer: reflecting
-    x2-inner: reflecting
-    x2-outer: reflecting
-    x3-inner: reflecting
-    x3-outer: reflecting
+    x2-inner: custom
+    x2-outer: custom
+    x3-inner: custom
+    x3-outer: custom
 
 integration:
   type: rk3
   cfl: 0.45
-  implicit-scheme: 1
-  nlim: -1
-  tlim: 100.e5
+  implicit-scheme: 9
+  nlim: 4
+  tlim: 1.e4
   ncycle_out: 1
 
 outputs:
-  - type: restart
-    dt: 1.E5
   - type: netcdf
-    variables: [prim, uov]
-    dt: 1.E3
-  - type: netcdf
-    variables: [thermo, path]
-    dt: 1.E3
+    variables: [prim, uov, thermo]
+    dt: 2.5e3
 
 forcing:
   const-gravity:
     grav1: -22.
-
-  top-cool:
-    flux: -100.
-    depth: 5
-
-  bot-heat:
-    flux: 100
-    depth: 5
 
 sedimentation:
   radius:
@@ -148,9 +141,9 @@ sedimentation:
     NH4SH(s,p): 1500.
 
   const-vsed:
-    H2O(l,p): -20.0
-    NH3(s,p): -20.0
-    NH4SH(s,p): -20.0
+    H2O(l,p): -2.0
+    NH3(s,p): -2.0
+    NH4SH(s,p): -2.0
 
 reactions:
   - equation: H2O => H2O(l)
@@ -159,7 +152,7 @@ reactions:
 
   - equation: H2O(l) => H2O(l,p)
     type: coagulation
-    rate-constant: {A: 0.001, b: 0, Ea_R: 0.}
+    rate-constant: {A: 0.01, b: 0, Ea_R: 0.}
 
   - equation: H2O(l,p) => H2O
     type: evaporation
@@ -171,7 +164,7 @@ reactions:
 
   - equation: NH3(s) => NH3(s,p)
     type: coagulation
-    rate-constant: {A: 0.001, b: 0, Ea_R: 2.}
+    rate-constant: {A: 0.01, b: 0, Ea_R: 2.}
 
   - equation: NH3(s,p) => NH3
     type: evaporation
@@ -183,7 +176,7 @@ reactions:
 
   - equation: NH4SH(s) => NH4SH(s,p)
     type: coagulation
-    rate-constant: {A: 0.001, b: 0, Ea_R: 0.}
+    rate-constant: {A: 0.01, b: 0, Ea_R: 0.}
 
   - equation: NH4SH(s,p) => NH3 + H2S
     type: evaporation
