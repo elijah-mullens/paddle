@@ -1,0 +1,103 @@
+reference-state:
+  Tref: 0.
+  Pref: 1.e5
+
+species:
+  - name: dry
+    composition: {O: 0.42, N: 1.56, Ar: 0.01}
+    cv_R: 2.5
+
+  - name: H2O
+    composition: {H: 2, O: 1}
+    cv_R: 2.5
+    u0_R: 0.
+
+  - name: H2O(l)
+    composition: {H: 2, O: 1}
+    cv_R: 9.0
+    u0_R: -3430.
+
+  - name: H2O(l,p)
+    composition: {H: 2, O: 1}
+    cv_R: 9.0
+    u0_R: -3430.
+
+geometry:
+  type: cartesian
+  bounds: {x1min: 0., x1max: 10.e3, x2min: 0., x2max: 20.e3, x3min: -0.5, x3max: 0.5}
+  cells: {nx1: 100, nx2: 1, nx3: 1, nghost: 3}
+
+dynamics:
+  disable: true
+  equation-of-state:
+    type: ideal-moist
+    density-floor: 1.e-10
+    pressure-floor: 1.e-10
+    tracer-floor: 1.e-10
+    limiter: true
+
+  vertical-projection:
+    type: temperature
+    pressure-margin: 1.e-6
+
+  reconstruct:
+    vertical: {type: weno5, scale: false, shock: false}
+    horizontal: {type: weno5, scale: false, shock: false}
+
+  riemann-solver:
+    type: lmars
+
+boundary-condition:
+  external:
+    x1-inner: reflecting
+    x1-outer: reflecting
+    x2-inner: periodic
+    x2-outer: periodic
+    x3-inner: periodic
+    x3-outer: periodic
+
+integration:
+  type: rk3
+  cfl: 0.9
+  implicit-scheme: 0
+  nlim: 10
+  tlim: 1000
+  ncycle_out: 1
+
+outputs:
+  - type: netcdf
+    variables: [prim, uov, thermo]
+    dt: 100.
+
+forcing:
+  const-gravity:
+    grav1: -9.8
+
+sedimentation:
+  radius:
+    H2O(l,p): 1.0e-10
+
+  density:
+    H2O(l,p): 1000.
+
+  const-vsed:
+    H2O(l,p): -10.0
+
+reactions:
+  - equation: H2O <=> H2O(l)
+    type: nucleation
+    rate-constant: {formula: h2o_ideal}
+
+  - equation: H2O(l) => H2O(l,p)
+    type: coagulation
+    rate-constant: {A: 0.1, b: 0, Ea_R: 0.}
+
+  - equation: H2O(l,p) => H2O
+    type: evaporation
+    rate-constant: {formula: h2o_ideal, diff_c: 0.2e-4, diff_T: 0., diff_P: 0., vm: 18.e-6, diameter: 1.e-4}
+
+problem:
+  Ps: 1.e5
+  Ts: 300.
+  Tmin: 200.
+  xH2O: 0.02

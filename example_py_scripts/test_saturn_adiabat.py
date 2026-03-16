@@ -1,21 +1,12 @@
-from paddle import (
-    setup_profile,
-    write_profile,
-    find_init_params,
-)
-from snapy import (
-    MeshBlockOptions,
-    MeshBlock,
-)
-from kintera import ThermoX
+import argparse
+
+from paddle import find_init_params, setup_profile, write_profile
+from snapy import MeshBlock, MeshBlockOptions
 
 
-def setup_saturn_profile():
-    path = "saturn1d.yaml"
-    print(f"Reading input file: {path}")
-
-    op_block = MeshBlockOptions.from_yaml(str(path), verbose=False)
-    block = MeshBlock(op_block)
+def setup_saturn_profile(infile: str, output: str) -> None:
+    options = MeshBlockOptions.from_yaml(infile, verbose=False)
+    block = MeshBlock(options)
 
     param = {
         "Ts": 800.0,
@@ -26,10 +17,7 @@ def setup_saturn_profile():
         "xH2S": 8.08e-5,
         "grav": 10.44,
     }
-
     method = "pseudo-adiabat"
-    # method = "moist-adiabat"
-    # method = "dry-adiabat"
 
     param = find_init_params(
         block,
@@ -41,14 +29,17 @@ def setup_saturn_profile():
         ftol=1.0e-2,
         verbose=False,
     )
+    hydro_w = setup_profile(block, param, method=method, verbose=False)
+    write_profile(output, block, hydro_w)
 
-    print("Found parameters:")
-    print(param)
 
-    w = setup_profile(block, param, method=method, verbose=False)
-    write_profile("saturn_profile.txt", block, w)
-    return w
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", default="saturn1d.yaml")
+    parser.add_argument("--output", default="saturn_profile.txt")
+    args = parser.parse_args()
+    setup_saturn_profile(args.input, args.output)
 
 
 if __name__ == "__main__":
-    w = setup_saturn_profile()
+    main()

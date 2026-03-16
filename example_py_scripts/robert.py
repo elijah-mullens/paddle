@@ -1,107 +1,107 @@
-import torch
-import math
-import kintera
+import argparse
 import os
-from snapy import MeshBlockOptions, MeshBlock
-from snapy import kIDN, kIPR
+
+import kintera
+import torch
+from snapy import MeshBlock, MeshBlockOptions, kIDN, kIPR
 
 
-def call_user_output(bvars):
-    hydro_w = bvars["hydro_w"]
-    out = {}
-    temp = hydro_w[kIPR] / (Rd * hydro_w[kIDN])
-    out["temp"] = temp
-    out["theta"] = temp * (p0 / hydro_w[kIPR]).pow(Rd / cp)
-    return out
+DT = 0.5
+P0 = 1.0e5
+TS = 303.15
+XC = 500.0
+YC = 0.0
+ZC = 260.0
+S = 100.0
+A = 50.0
 
 
-dT = 0.5
-p0 = 1.0e5
-Ts = 303.15
-xc = 500.0
-yc = 0.0
-zc = 260.0
-s = 100.0
-a = 50.0
-uniform_bubble = False
+def select_device(block: MeshBlock, options: MeshBlockOptions) -> torch.device:
+    if torch.cuda.is_available() and options.layout().backend() == "nccl":
+        return torch.device(block.device())
+    return torch.device("cpu")
 
-# set hydrodynamic options
-op = MeshBlockOptions.from_yaml("robert.yaml")
-block = MeshBlock(op)
 
-# use cuda if available
-if torch.cuda.is_available() and op.layout().backend() == "nccl":
-    device = torch.device(block.device())
-else:
-    device = torch.device("cpu")
+def run_with(infile: str, restart_file: str = "") -> None:
+    options = MeshBlockOptions.from_yaml(infile)
+    block = MeshBlock(options)
+    device = select_device(block, options)
+    block.to(device)
 
-block.to(device)
-block.set_user_output_func(call_user_output)
+    coord = block.module("coord")
+    eos = block.module("hydro.eos")
+    intg = block.module("intg")
+    grav = -block.options.hydro().grav().grav1()
 
-# get handles to modules
-coord = block.module("coord")
-eos = block.module("hydro.eos")
-grav = -block.options.hydro().grav().grav1()
+    gamma = eos.options.gammad()
+    rd = kintera.constants.Rgas / eos.options.weight()
+    cp = gamma / (gamma - 1.0) * rd
 
-# thermodynamics
-gamma = eos.options.gammad()
-Rd = kintera.constants.Rgas / eos.options.weight()
-cp = gamma / (gamma - 1.0) * Rd
+    def call_user_output(bvars: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        hydro_w = bvars["hydro_w"]
+        temp = hydro_w[kIPR] / (rd * hydro_w[kIDN])
+        return {
+            "temp": temp,
+            "theta": temp * (P0 / hydro_w[kIPR]).pow(rd / cp),
+        }
 
-# set initial condition
-x3v, x2v, x1v = torch.meshgrid(
-    coord.buffer("x3v"), coord.buffer("x2v"), coord.buffer("x1v"), indexing="ij"
-)
+    block.set_user_output_func(call_user_output)
 
-# initialize from "robert.final.restart" if exists
-if os.path.exists("robert.final.restart"):
-    block_vars, current_time = block.initialize_from_restart("robert.final.restart")
-    # extend the time by a factor of 2
-    block.options.intg().tlim(2.0 * block.options.intg().tlim())
-    print(
-        "Initialized from robert.final.restart, extending time to",
-        block.options.intg().tlim(),
+    x3v, x2v, x1v = torch.meshgrid(
+        coord.buffer("x3v"), coord.buffer("x2v"), coord.buffer("x1v"), indexing="ij"
     )
-else:
-    # dimensions
-    nc3 = coord.buffer("x3v").shape[0]
-    nc2 = coord.buffer("x2v").shape[0]
-    nc1 = coord.buffer("x1v").shape[0]
 
-    w = torch.zeros((eos.nvar(), nc3, nc2, nc1), device=device)
+    restart_path = restart_file or "robert.final.restart"
+    if restart_path and os.path.exists(restart_path):
+        block_vars, current_time = block.initialize_from_restart(restart_path)
+        block.options.intg().tlim(2.0 * block.options.intg().tlim())
+    else:
+        nc3 = coord.buffer("x3v").shape[0]
+        nc2 = coord.buffer("x2v").shape[0]
+        nc1 = coord.buffer("x1v").shape[0]
+        hydro_w = torch.zeros((eos.nvar(), nc3, nc2, nc1), device=device)
 
-    temp = Ts - grav * x1v / cp
-    w[kIPR] = p0 * torch.pow(temp / Ts, cp / Rd)
+        temp = TS - grav * x1v / cp
+        hydro_w[kIPR] = P0 * torch.pow(temp / TS, cp / rd)
 
-    r = torch.sqrt((x3v - yc) ** 2 + (x2v - xc) ** 2 + (x1v - zc) ** 2)
-    temp += torch.where(r <= a, dT * torch.pow(w[kIPR] / p0, Rd / cp), 0.0)
-    if not uniform_bubble:
+        radius = torch.sqrt((x3v - YC) ** 2 + (x2v - XC) ** 2 + (x1v - ZC) ** 2)
+        temp += torch.where(radius <= A, DT * torch.pow(hydro_w[kIPR] / P0, rd / cp), 0.0)
         temp += torch.where(
-            r > a,
-            dT * torch.exp(-(((r - a) / s) ** 2)) * torch.pow(w[kIPR] / p0, Rd / cp),
+            radius > A,
+            DT * torch.exp(-(((radius - A) / S) ** 2)) * torch.pow(hydro_w[kIPR] / P0, rd / cp),
             0.0,
         )
-    w[kIDN] = w[kIPR] / (Rd * temp)
+        hydro_w[kIDN] = hydro_w[kIPR] / (rd * temp)
+        block_vars, current_time = block.initialize({"hydro_w": hydro_w})
 
-    block_vars, current_time = block.initialize({"hydro_w": w})
-
-# integration
-block.make_outputs(block_vars, current_time)
-
-while not block.intg.stop(block.inc_cycle(), current_time):
-    dt = block.max_time_step(block_vars)
-    block.print_cycle_info(block_vars, current_time, dt)
-
-    for stage in range(len(block.intg.stages)):
-        block.forward(block_vars, dt, stage)
-
-    err = block.check_redo(block_vars)
-    if err > 0:
-        continue  # redo current step
-    if err < 0:
-        break  # terminate
-
-    current_time += dt
     block.make_outputs(block_vars, current_time)
 
-block.finalize(block_vars, current_time)
+    while not intg.stop(block.inc_cycle(), current_time):
+        dt = block.max_time_step(block_vars)
+        block.print_cycle_info(block_vars, current_time, dt)
+
+        for stage in range(len(intg.stages)):
+            block.forward(block_vars, dt, stage)
+
+        err = block.check_redo(block_vars)
+        if err > 0:
+            continue
+        if err < 0:
+            break
+
+        current_time += dt
+        block.make_outputs(block_vars, current_time)
+
+    block.finalize(block_vars, current_time)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", default="robert.yaml")
+    parser.add_argument("--restart", default="")
+    args = parser.parse_args()
+    run_with(args.input, args.restart)
+
+
+if __name__ == "__main__":
+    main()
