@@ -49,6 +49,10 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
+      - name: Install macOS native dependencies
+        if: runner.os == 'macOS'
+        run: brew install netcdf
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
