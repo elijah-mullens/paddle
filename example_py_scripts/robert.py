@@ -65,10 +65,14 @@ def run_with(infile: str, restart_file: str = "") -> None:
         hydro_w[kIPR] = P0 * torch.pow(temp / TS, cp / rd)
 
         radius = torch.sqrt((x3v - YC) ** 2 + (x2v - XC) ** 2 + (x1v - ZC) ** 2)
-        temp += torch.where(radius <= A, DT * torch.pow(hydro_w[kIPR] / P0, rd / cp), 0.0)
+        temp += torch.where(
+            radius <= A, DT * torch.pow(hydro_w[kIPR] / P0, rd / cp), 0.0
+        )
         temp += torch.where(
             radius > A,
-            DT * torch.exp(-(((radius - A) / S) ** 2)) * torch.pow(hydro_w[kIPR] / P0, rd / cp),
+            DT
+            * torch.exp(-(((radius - A) / S) ** 2))
+            * torch.pow(hydro_w[kIPR] / P0, rd / cp),
             0.0,
         )
         hydro_w[kIDN] = hydro_w[kIPR] / (rd * temp)

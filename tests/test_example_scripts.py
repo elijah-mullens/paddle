@@ -53,7 +53,9 @@ def _write_yaml(tmp_path: Path, source_name: str, updates: dict) -> Path:
     return target
 
 
-def _run_single(script_name: str, yaml_path: Path | None, extra_args: list[str] | None = None) -> None:
+def _run_single(
+    script_name: str, yaml_path: Path | None, extra_args: list[str] | None = None
+) -> None:
     env = _base_env()
     env["MASTER_ADDR"] = "127.0.0.1"
     env["MASTER_PORT"] = str(_get_free_port())

@@ -58,7 +58,9 @@ def run_with(infile: str) -> None:
     temp = TS - grav * x1v / cp
     hydro_w[kIPR] = P0 * torch.pow(temp / TS, cp / rd)
     length = torch.sqrt(((x2v - XC) / XR) ** 2 + ((x1v - ZC) / ZR) ** 2)
-    temp += torch.where(length <= 1.0, DT * (torch.cos(length * math.pi) + 1.0) / 2.0, 0.0)
+    temp += torch.where(
+        length <= 1.0, DT * (torch.cos(length * math.pi) + 1.0) / 2.0, 0.0
+    )
     hydro_w[kIDN] = hydro_w[kIPR] / (rd * temp)
 
     block_vars, current_time = block.initialize({"hydro_w": hydro_w})

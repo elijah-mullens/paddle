@@ -60,8 +60,16 @@ def run_with(infile: str) -> None:
 
     for _ in range(count):
         zc = 0.04 * torch.rand((), device=device) - 0.02
-        xc = 0.04 * torch.rand((), device=device) - 0.02 if nc2 > 1 else torch.tensor(0.0, device=device)
-        yc = 0.04 * torch.rand((), device=device) - 0.02 if nc3 > 1 else torch.tensor(0.0, device=device)
+        xc = (
+            0.04 * torch.rand((), device=device) - 0.02
+            if nc2 > 1
+            else torch.tensor(0.0, device=device)
+        )
+        yc = (
+            0.04 * torch.rand((), device=device) - 0.02
+            if nc3 > 1
+            else torch.tensor(0.0, device=device)
+        )
         dist = torch.sqrt((x1v - zc) ** 2 + (x2v - xc) ** 2 + (x3v - yc) ** 2)
         hot = dist < radius
         temp[hot] = dt_burst
