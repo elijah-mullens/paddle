@@ -1,19 +1,9 @@
 import argparse
-import os
 
 import kintera
 import torch
+import yaml
 from snapy import MeshBlock, MeshBlockOptions, kIDN, kIPR
-
-
-DT = 0.5
-P0 = 1.0e5
-TS = 303.15
-XC = 500.0
-YC = 0.0
-ZC = 260.0
-S = 100.0
-A = 50.0
 
 
 def select_device(block: MeshBlock, options: MeshBlockOptions) -> torch.device:
@@ -22,7 +12,10 @@ def select_device(block: MeshBlock, options: MeshBlockOptions) -> torch.device:
     return torch.device("cpu")
 
 
-def run_with(infile: str, restart_file: str = "") -> None:
+def run_with(infile: str) -> None:
+    with open(infile, "r", encoding="utf-8") as stream:
+        config = yaml.safe_load(stream)
+
     options = MeshBlockOptions.from_yaml(infile)
     block = MeshBlock(options)
     device = select_device(block, options)
@@ -31,18 +24,18 @@ def run_with(infile: str, restart_file: str = "") -> None:
     coord = block.module("coord")
     eos = block.module("hydro.eos")
     intg = block.module("intg")
-    grav = -block.options.hydro().grav().grav1()
 
     gamma = eos.options.gammad()
     rd = kintera.constants.Rgas / eos.options.weight()
     cp = gamma / (gamma - 1.0) * rd
+    p0 = float(config["problem"]["p0"])
 
     def call_user_output(bvars: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         hydro_w = bvars["hydro_w"]
         temp = hydro_w[kIPR] / (rd * hydro_w[kIDN])
         return {
             "temp": temp,
-            "theta": temp * (P0 / hydro_w[kIPR]).pow(rd / cp),
+            "theta": temp * (p0 / hydro_w[kIPR]).pow(rd / cp),
         }
 
     block.set_user_output_func(call_user_output)
@@ -51,33 +44,39 @@ def run_with(infile: str, restart_file: str = "") -> None:
         coord.buffer("x3v"), coord.buffer("x2v"), coord.buffer("x1v"), indexing="ij"
     )
 
-    restart_path = restart_file or "robert.final.restart"
-    if restart_path and os.path.exists(restart_path):
-        block_vars, current_time = block.initialize_from_restart(restart_path)
-        block.options.intg().tlim(2.0 * block.options.intg().tlim())
-    else:
-        nc3 = coord.buffer("x3v").shape[0]
-        nc2 = coord.buffer("x2v").shape[0]
-        nc1 = coord.buffer("x1v").shape[0]
-        hydro_w = torch.zeros((eos.nvar(), nc3, nc2, nc1), device=device)
+    nc3 = coord.buffer("x3v").shape[0]
+    nc2 = coord.buffer("x2v").shape[0]
+    nc1 = coord.buffer("x1v").shape[0]
+    hydro_w = torch.zeros((eos.nvar(), nc3, nc2, nc1), device=device)
 
-        temp = TS - grav * x1v / cp
-        hydro_w[kIPR] = P0 * torch.pow(temp / TS, cp / rd)
+    ts = float(config["problem"]["Ts"])
+    radius = float(config["problem"]["radius"])
+    dt_burst = float(config["problem"]["dT"])
+    dp_burst = float(config["problem"]["dP"])
+    count = int(config["problem"].get("count", 5))
 
-        radius = torch.sqrt((x3v - YC) ** 2 + (x2v - XC) ** 2 + (x1v - ZC) ** 2)
-        temp += torch.where(
-            radius <= A, DT * torch.pow(hydro_w[kIPR] / P0, rd / cp), 0.0
+    temp = torch.full((nc3, nc2, nc1), ts, device=device)
+    hydro_w[kIPR] = p0
+
+    for _ in range(count):
+        zc = 0.04 * torch.rand((), device=device) - 0.02
+        xc = (
+            0.04 * torch.rand((), device=device) - 0.02
+            if nc2 > 1
+            else torch.tensor(0.0, device=device)
         )
-        temp += torch.where(
-            radius > A,
-            DT
-            * torch.exp(-(((radius - A) / S) ** 2))
-            * torch.pow(hydro_w[kIPR] / P0, rd / cp),
-            0.0,
+        yc = (
+            0.04 * torch.rand((), device=device) - 0.02
+            if nc3 > 1
+            else torch.tensor(0.0, device=device)
         )
-        hydro_w[kIDN] = hydro_w[kIPR] / (rd * temp)
-        block_vars, current_time = block.initialize({"hydro_w": hydro_w})
+        dist = torch.sqrt((x1v - zc) ** 2 + (x2v - xc) ** 2 + (x3v - yc) ** 2)
+        hot = dist < radius
+        temp[hot] = dt_burst
+        hydro_w[kIPR][hot] = dp_burst
 
+    hydro_w[kIDN] = hydro_w[kIPR] / (rd * temp)
+    block_vars, current_time = block.initialize({"hydro_w": hydro_w})
     block.make_outputs(block_vars, current_time)
 
     while not intg.stop(block.inc_cycle(), current_time):
@@ -101,10 +100,9 @@ def run_with(infile: str, restart_file: str = "") -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="robert.yaml")
-    parser.add_argument("--restart", default="")
+    parser.add_argument("--input", default="explosion.yaml")
     args = parser.parse_args()
-    run_with(args.input, args.restart)
+    run_with(args.input)
 
 
 if __name__ == "__main__":

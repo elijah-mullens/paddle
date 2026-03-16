@@ -1,67 +1,70 @@
+import argparse
+
 import torch
-from snapy import MeshBlockOptions, MeshBlock
-from snapy import kIDN, kIPR, kIV1, kIV2, kIV3
+from snapy import MeshBlock, MeshBlockOptions, kIDN, kIPR, kIV1, kIV2, kIV3
 
-# use cuda if available
-if torch.cuda.is_available():
-    device = torch.device("cuda:0")
-else:
-    device = torch.device("cpu")
 
-# set hydrodynamic model
-op = MeshBlockOptions.from_yaml("shock.yaml")
+def select_device(block: MeshBlock, options: MeshBlockOptions) -> torch.device:
+    if torch.cuda.is_available() and options.layout().backend() == "nccl":
+        return torch.device(block.device())
+    return torch.device("cpu")
 
-# initialize block
-block = MeshBlock(op)
-block.to(device)
 
-# get handles to modules
-coord = block.hydro.module("coord")
+def run_with(infile: str) -> None:
+    options = MeshBlockOptions.from_yaml(infile)
+    block = MeshBlock(options)
+    device = select_device(block, options)
+    block.to(device)
 
-# set initial condition
-x3v, x2v, x1v = torch.meshgrid(
-    coord.buffer("x3v"), coord.buffer("x2v"), coord.buffer("x1v"), indexing="ij"
-)
+    coord = block.module("coord")
+    intg = block.module("intg")
 
-# dimensions
-nc3 = coord.buffer("x3v").shape[0]
-nc2 = coord.buffer("x2v").shape[0]
-nc1 = coord.buffer("x1v").shape[0]
-nvar = 5
+    x3v, x2v, x1v = torch.meshgrid(
+        coord.buffer("x3v"), coord.buffer("x2v"), coord.buffer("x1v"), indexing="ij"
+    )
 
-w = torch.zeros((nvar, nc3, nc2, nc1), device=device)
+    nc3 = coord.buffer("x3v").shape[0]
+    nc2 = coord.buffer("x2v").shape[0]
+    nc1 = coord.buffer("x1v").shape[0]
 
-w[kIDN] = torch.where(x1v < 0.0, 1.0, 0.125)
-w[kIPR] = torch.where(x1v < 0.0, 1.0, 0.1)
-w[kIV1] = w[kIV2] = w[kIV3] = 0.0
+    hydro_w = torch.zeros((5, nc3, nc2, nc1), device=device)
+    hydro_w[kIDN] = torch.where(x1v < 0.0, 1.0, 0.125)
+    hydro_w[kIPR] = torch.where(x1v < 0.0, 1.0, 0.1)
+    hydro_w[kIV1] = 0.0
+    hydro_w[kIV2] = 0.0
+    hydro_w[kIV3] = 0.0
 
-# internal boundary
-r1 = torch.sqrt(x1v * x1v + x2v * x2v + x3v * x3v)
-solid = torch.where(r1 < 0.1, 1, 0).to(torch.bool)
+    radius = torch.sqrt(x1v * x1v + x2v * x2v + x3v * x3v)
+    solid = radius < 0.1
 
-block_vars = {}
-block_vars["hydro_w"] = w
-block_vars["solid"] = solid
-block_vars, current_time = block.initialize(block_vars)
-
-# integration
-current_time = 0.0
-block.make_outputs(block_vars, current_time)
-
-while not block.intg.stop(block.inc_cycle(), current_time):
-    dt = block.max_time_step(block_vars)
-    block.print_cycle_info(block_vars, current_time, dt)
-
-    for stage in range(len(block.intg.stages)):
-        block.forward(block_vars, dt, stage)
-
-    err = block.check_redo(block_vars)
-    if err > 0:
-        continue  # redo current step
-    if err < 0:
-        break  # terminate
-
-    current_time += dt
+    block_vars, current_time = block.initialize({"hydro_w": hydro_w, "solid": solid})
     block.make_outputs(block_vars, current_time)
 
-block.finalize(block_vars, current_time)
+    while not intg.stop(block.inc_cycle(), current_time):
+        dt = block.max_time_step(block_vars)
+        block.print_cycle_info(block_vars, current_time, dt)
+
+        for stage in range(len(intg.stages)):
+            block.forward(block_vars, dt, stage)
+
+        err = block.check_redo(block_vars)
+        if err > 0:
+            continue
+        if err < 0:
+            break
+
+        current_time += dt
+        block.make_outputs(block_vars, current_time)
+
+    block.finalize(block_vars, current_time)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", default="shock.yaml")
+    args = parser.parse_args()
+    run_with(args.input)
+
+
+if __name__ == "__main__":
+    main()

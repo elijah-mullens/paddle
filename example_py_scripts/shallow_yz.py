@@ -1,69 +1,74 @@
+import argparse
+
 import torch
+import yaml
+from snapy import MeshBlock, MeshBlockOptions, kIDN, kIV2, kIV3
 
-import time
-from snapy import MeshBlockOptions, MeshBlock
-from snapy import kIDN, kIV2, kIV3
 
-phi = 10.0
-uphi = 10.0
-dphi = 2.0
+def select_device(block: MeshBlock, options: MeshBlockOptions) -> torch.device:
+    if torch.cuda.is_available() and options.layout().backend() == "nccl":
+        return torch.device(block.device())
+    return torch.device("cpu")
 
-# use cuda if available
-if torch.cuda.is_available():
-    device = torch.device("cuda:0")
-else:
-    device = torch.device("cpu")
 
-# set hydrodynamic options
-op = MeshBlockOptions.from_yaml("shallow_yz.yaml", verbose=False)
+def run_with(infile: str) -> None:
+    with open(infile, "r", encoding="utf-8") as stream:
+        config = yaml.safe_load(stream)
 
-# initialize block
-block = MeshBlock(op)
-block.to(device)
+    phi = float(config["problem"]["phi"])
+    uphi = float(config["problem"]["uphi"])
+    dphi = float(config["problem"]["dphi"])
 
-# get handles to modules
-coord = block.module("coord")
+    options = MeshBlockOptions.from_yaml(infile, verbose=False)
+    block = MeshBlock(options)
+    device = select_device(block, options)
+    block.to(device)
 
-# set initial condition
-x3v, x2v, _ = torch.meshgrid(
-    coord.buffer("x3v"), coord.buffer("x2v"), coord.buffer("x1v"), indexing="ij"
-)
+    coord = block.module("coord")
+    intg = block.module("intg")
 
-# dimensions
-nc3 = coord.buffer("x3v").shape[0]
-nc2 = coord.buffer("x2v").shape[0]
-nc1 = coord.buffer("x1v").shape[0]
-nvar = 4
+    x3v, x2v, _ = torch.meshgrid(
+        coord.buffer("x3v"), coord.buffer("x2v"), coord.buffer("x1v"), indexing="ij"
+    )
 
-w = torch.zeros((nvar, nc3, nc2, nc1), device=device)
+    nc3 = coord.buffer("x3v").shape[0]
+    nc2 = coord.buffer("x2v").shape[0]
+    nc1 = coord.buffer("x1v").shape[0]
+    hydro_w = torch.zeros((4, nc3, nc2, nc1), device=device)
 
-w[kIDN] = phi
-w[kIDN][torch.logical_and(x3v > 0.0, x3v < 5.0)] += dphi
-w[kIV3] = torch.where(x2v > 0.0, -uphi / w[kIDN], uphi / w[kIDN])
-w[kIV2] = 0.0
+    hydro_w[kIDN] = phi
+    hydro_w[kIDN][torch.logical_and(x3v > 0.0, x3v < 5.0)] += dphi
+    hydro_w[kIV3] = torch.where(x2v > 0.0, -uphi / hydro_w[kIDN], uphi / hydro_w[kIDN])
+    hydro_w[kIV2] = 0.0
 
-block_vars = {}
-block_vars["hydro_w"] = w
-block_vars, current_time = block.initialize(block_vars)
-
-# integration
-start_time = time.time()
-block.make_outputs(block_vars, current_time)
-
-while not block.intg.stop(block.inc_cycle(), current_time):
-    dt = block.max_time_step(block_vars)
-    block.print_cycle_info(block_vars, current_time, dt)
-
-    for stage in range(len(block.intg.stages)):
-        block.forward(block_vars, dt, stage)
-
-    err = block.check_redo(block_vars)
-    if err > 0:
-        continue  # redo current step
-    if err < 0:
-        break  # terminate
-
-    current_time += dt
+    block_vars, current_time = block.initialize({"hydro_w": hydro_w})
     block.make_outputs(block_vars, current_time)
 
-block.finalize(block_vars, current_time)
+    while not intg.stop(block.inc_cycle(), current_time):
+        dt = block.max_time_step(block_vars)
+        block.print_cycle_info(block_vars, current_time, dt)
+
+        for stage in range(len(intg.stages)):
+            block.forward(block_vars, dt, stage)
+
+        err = block.check_redo(block_vars)
+        if err > 0:
+            continue
+        if err < 0:
+            break
+
+        current_time += dt
+        block.make_outputs(block_vars, current_time)
+
+    block.finalize(block_vars, current_time)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", default="shallow_yz.yaml")
+    args = parser.parse_args()
+    run_with(args.input)
+
+
+if __name__ == "__main__":
+    main()

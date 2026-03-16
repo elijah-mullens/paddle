@@ -1,18 +1,9 @@
 import argparse
-import math
 
-import kintera
 import torch
-from snapy import MeshBlock, MeshBlockOptions, kIDN, kIPR
-
-
-P0 = 1.0e5
-TS = 300.0
-XC = 0.0
-XR = 4.0e3
-ZC = 3.0e3
-ZR = 2.0e3
-DT = -15.0
+import yaml
+from snapy import MeshBlock, MeshBlockOptions, kICY, kIV1
+from paddle import setup_profile
 
 
 def select_device(block: MeshBlock, options: MeshBlockOptions) -> torch.device:
@@ -21,50 +12,46 @@ def select_device(block: MeshBlock, options: MeshBlockOptions) -> torch.device:
     return torch.device("cpu")
 
 
+def make_params(config: dict, species: list[str]) -> dict[str, float]:
+    param = {
+        "Ts": float(config["problem"]["Ts"]),
+        "Ps": float(config["problem"]["Ps"]),
+        "grav": -float(config["forcing"]["const-gravity"]["grav1"]),
+        "Tmin": float(config["problem"]["Tmin"]),
+    }
+    for name in species:
+        param[f"x{name}"] = float(config["problem"].get(f"x{name}", 0.0))
+    return param
+
+
 def run_with(infile: str) -> None:
-    options = MeshBlockOptions.from_yaml(infile)
+    with open(infile, "r", encoding="utf-8") as stream:
+        config = yaml.safe_load(stream)
+
+    options = MeshBlockOptions.from_yaml(infile, verbose=False)
     block = MeshBlock(options)
     device = select_device(block, options)
     block.to(device)
 
-    coord = block.module("coord")
-    eos = block.module("hydro.eos")
+    thermo_y = block.module("hydro.eos.thermo")
     intg = block.module("intg")
-    grav = -block.options.hydro().grav().grav1()
-
-    rd = kintera.constants.Rgas / eos.options.weight()
-    gamma = eos.options.gammad()
-    cp = gamma / (gamma - 1.0) * rd
+    param = make_params(config, thermo_y.options.species())
 
     def call_user_output(bvars: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         hydro_w = bvars["hydro_w"]
-        temp = hydro_w[kIPR] / (rd * hydro_w[kIDN])
-        return {
-            "temp": temp,
-            "theta": temp * (P0 / hydro_w[kIPR]).pow(rd / cp),
-        }
+        return {"qtol": hydro_w[kICY:].sum(dim=0)}
 
     block.set_user_output_func(call_user_output)
 
-    x3v, x2v, x1v = torch.meshgrid(
-        coord.buffer("x3v"), coord.buffer("x2v"), coord.buffer("x1v"), indexing="ij"
-    )
-
-    nc3 = coord.buffer("x3v").shape[0]
-    nc2 = coord.buffer("x2v").shape[0]
-    nc1 = coord.buffer("x1v").shape[0]
-    hydro_w = torch.zeros((5, nc3, nc2, nc1), device=device)
-
-    temp = TS - grav * x1v / cp
-    hydro_w[kIPR] = P0 * torch.pow(temp / TS, cp / rd)
-    length = torch.sqrt(((x2v - XC) / XR) ** 2 + ((x1v - ZC) / ZR) ** 2)
-    temp += torch.where(
-        length <= 1.0, DT * (torch.cos(length * math.pi) + 1.0) / 2.0, 0.0
-    )
-    hydro_w[kIDN] = hydro_w[kIPR] / (rd * temp)
+    hydro_w = setup_profile(block, param, method="pseudo-adiabat")
+    hydro_w[kIV1] += 0.01 * torch.rand_like(hydro_w[kIV1])
 
     block_vars, current_time = block.initialize({"hydro_w": hydro_w})
     block.make_outputs(block_vars, current_time)
+
+    if config.get("dynamics", {}).get("disable", False):
+        block.finalize(block_vars, current_time)
+        return
 
     while not intg.stop(block.inc_cycle(), current_time):
         dt = block.max_time_step(block_vars)
@@ -87,7 +74,7 @@ def run_with(infile: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="straka.yaml")
+    parser.add_argument("--input", default="earth_moist.yaml")
     args = parser.parse_args()
     run_with(args.input)
 
