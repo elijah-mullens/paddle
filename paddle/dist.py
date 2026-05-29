@@ -14,14 +14,15 @@ def start_dist(backend: str) -> torch.device:
     os.environ.setdefault("LOCAL_RANK", os.environ["RANK"])
 
     local_rank = int(os.environ["LOCAL_RANK"])
+    device_id = int(os.environ.get("DEVICE_ID", local_rank))
     if backend == "gloo":
         dist.init_process_group(backend="gloo", init_method="env://")
         device = torch.device("cpu")
     elif backend == "nccl":
         if not torch.cuda.is_available():
             raise RuntimeError("NCCL backend requires CUDA")
-        torch.cuda.set_device(local_rank)
-        device = torch.device(f"cuda:{local_rank}")
+        torch.cuda.set_device(device_id)
+        device = torch.device(f"cuda:{device_id}")
         dist.init_process_group(
             backend="cpu:gloo,cuda:nccl", device_id=device, init_method="env://"
         )
