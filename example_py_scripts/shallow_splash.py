@@ -74,7 +74,7 @@ def initialize_block(
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default="shallow_splash.yaml")
-    parser.add_argument("--output-dir", default="/data")
+    parser.add_argument("--output-dir", default="./output")
     args = parser.parse_args()
 
     with open(args.input, "r", encoding="utf-8") as stream:
@@ -83,6 +83,8 @@ def main() -> None:
     device = init_dist(config["distribute"].get("backend", "gloo"))
 
     options = MeshOptions.from_yaml(args.input, verbose=False)
+    options.block().output_dir(args.output_dir)
+
     mesh = Mesh(options)
     mesh.to(device)
 
