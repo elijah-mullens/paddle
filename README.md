@@ -211,21 +211,25 @@ paddle submit dart1 --file train.py --file input.yaml -- python train.py
 paddle submit dart1 --nodelist path/to/nodelist --timeout 15 -- ./run.sh
 ```
 
-The command validates that the host is in the nodelist, connects using
-password-less SSH, and prints the local SSH transport PID and local log path.
+The command validates that the host is in the nodelist and connects using
+password-less SSH. Without `--log`, the command runs in the foreground and its
+output is displayed in the submitting terminal. Pressing Ctrl-C terminates the
+SSH connection and terminates the remote foreground command's process group and
+descendant processes. With `--log REMOTE_PATH`, the command runs in the remote
+background, writes output to that remote path, and reports its remote PID.
+
 Jobs run from the remote home directory by default; use `--cwd` to select
-another remote directory. The detached local SSH process streams the remote
-command's output into a log in the submitting machine's current directory by
-default. Before executing the command, the remote launcher sources
-`${HOME}/.bash_profile`, including aliases such as `ll`. The job ends if that
-SSH connection is interrupted. Arguments after `--` are executed literally;
-use an explicit shell command such as
+another remote directory. Before executing the command, the remote launcher
+sources `${HOME}/.bash_profile`, including aliases when their startup scripts
+permit non-interactive use. Arguments after `--` are executed literally; use
+an explicit shell command such as
 `sh -lc 'python train.py | tee summary.txt'` when pipes, redirects, or other
 shell expressions are needed.
 
 Repeat `--file PATH` to copy local regular files into the remote working
 directory before execution. Each file keeps its local permission bits and is
-placed under its basename; directories and duplicate basenames are rejected.
+placed under its basename, atomically replacing an existing remote file with
+the same name. Directories and duplicate basenames are rejected.
 
 ## Troubleshooting
 

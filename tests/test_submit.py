@@ -12,6 +12,7 @@ from paddle.submit import (
     Submission,
     _remote_invocation,
     main,
+    run_foreground,
     submission_json,
     submit_job,
     transfer_files,
@@ -19,12 +20,15 @@ from paddle.submit import (
 
 
 def test_remote_invocation_preserves_literal_arguments() -> None:
-    invocation = _remote_invocation("~/work dir", ["printf", "%s", "hello; $(false)"])
+    invocation = _remote_invocation(
+        "~/work dir", "job-1", ["printf", "%s", "hello; $(false)"]
+    )
     arguments = shlex.split(invocation)
     assert arguments[:2] == ["bash", "-c"]
     assert arguments[3:] == [
         "bash",
         "~/work dir",
+        "job-1",
         "printf",
         "%s",
         "hello; $(false)",
@@ -32,14 +36,20 @@ def test_remote_invocation_preserves_literal_arguments() -> None:
     assert 'source "${HOME}/.bash_profile"' in arguments[2]
     assert "shopt -s expand_aliases" in arguments[2]
     assert "printf -v command_line '%q ' \"$@\"" in arguments[2]
-    assert 'eval "$command_line"' in arguments[2]
+    assert 'eval "$command_line" &' in arguments[2]
+    assert "trap terminate_job HUP INT TERM" in arguments[2]
+    assert "collect_descendants" in arguments[2]
+    assert "collect_tagged_processes" in arguments[2]
+    assert "PADDLE_JOB_ID=$job_id" in arguments[2]
+    assert 'kill -TERM -- "-$pid"' in arguments[2]
+    assert 'kill -KILL -- "-$pid"' in arguments[2]
 
 
 def test_remote_invocation_expands_alias_from_bash_profile(tmp_path: Path) -> None:
     (tmp_path / ".bash_profile").write_text(
         "alias paddle_test_alias='printf alias-expanded'\n", encoding="utf-8"
     )
-    invocation = _remote_invocation("~", ["paddle_test_alias"])
+    invocation = _remote_invocation("~", "job-1", ["paddle_test_alias"])
 
     result = subprocess.run(
         ["bash", "-c", invocation],
@@ -53,15 +63,15 @@ def test_remote_invocation_expands_alias_from_bash_profile(tmp_path: Path) -> No
     assert result.stdout == "alias-expanded"
 
 
-def test_submit_job_streams_to_local_log(tmp_path: Path, monkeypatch) -> None:
+def test_submit_job_without_log_streams_to_terminal(
+    tmp_path: Path, monkeypatch
+) -> None:
     calls: list[tuple[list[str], dict]] = []
     transfers: list[tuple[str, list[Path], str, float]] = []
 
     class Process:
-        pid = 123
-
-        def wait(self, timeout):
-            raise subprocess.TimeoutExpired("ssh", timeout)
+        def wait(self):
+            return 0
 
     def fake_popen(command, **kwargs):
         calls.append((command, kwargs))
@@ -80,7 +90,6 @@ def test_submit_job_streams_to_local_log(tmp_path: Path, monkeypatch) -> None:
         "dart1",
         ["python", "train.py", "--epochs", "2"],
         cwd="~/work",
-        log=str(tmp_path / "job.log"),
         timeout=7,
         files=[source],
     )
@@ -89,9 +98,9 @@ def test_submit_job_streams_to_local_log(tmp_path: Path, monkeypatch) -> None:
     assert submission == Submission(
         "job-1",
         "dart1",
-        123,
+        None,
         "~/work",
-        str(tmp_path / "job.log"),
+        None,
         ["python", "train.py", "--epochs", "2"],
     )
     ssh_command, options = calls[0]
@@ -104,16 +113,152 @@ def test_submit_job_streams_to_local_log(tmp_path: Path, monkeypatch) -> None:
         "--",
     ]
     assert ssh_command[6] == "dart1"
-    assert shlex.split(ssh_command[7])[-4:] == [
+    assert shlex.split(ssh_command[7])[-5:] == [
+        "job-1",
         "python",
         "train.py",
         "--epochs",
         "2",
     ]
-    assert options["stdin"] == subprocess.DEVNULL
-    assert options["stderr"] == subprocess.STDOUT
-    assert options["start_new_session"] is True
-    assert options["stdout"].name == str(tmp_path / "job.log")
+    assert options == {}
+
+
+def test_run_foreground_terminates_ssh_on_keyboard_interrupt(monkeypatch) -> None:
+    events: list[object] = []
+
+    class Process:
+        def wait(self, timeout=None):
+            events.append(("wait", timeout))
+            if timeout is None:
+                raise KeyboardInterrupt
+            return -15
+
+        def terminate(self):
+            events.append("terminate")
+
+        def kill(self):
+            events.append("kill")
+
+    monkeypatch.setattr(
+        "paddle.submit.subprocess.Popen", lambda *args, **kwargs: Process()
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        run_foreground("dart1", ["sleep", "60"], cwd="~", job_id="job-1", timeout=10)
+    assert events == [("wait", None), "terminate", ("wait", 5)]
+
+
+def test_run_foreground_kills_unresponsive_ssh_on_keyboard_interrupt(
+    monkeypatch,
+) -> None:
+    events: list[object] = []
+
+    class Process:
+        def wait(self, timeout=None):
+            events.append(("wait", timeout))
+            if timeout is None:
+                raise KeyboardInterrupt
+            if timeout == 5:
+                raise subprocess.TimeoutExpired("ssh", timeout)
+            return -9
+
+        def terminate(self):
+            events.append("terminate")
+
+        def kill(self):
+            events.append("kill")
+
+    monkeypatch.setattr(
+        "paddle.submit.subprocess.Popen", lambda *args, **kwargs: Process()
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        run_foreground("dart1", ["sleep", "60"], cwd="~", job_id="job-1", timeout=10)
+    assert events == [
+        ("wait", None),
+        "terminate",
+        ("wait", 5),
+        "kill",
+        ("wait", None),
+    ]
+
+
+@pytest.mark.skipif(
+    not Path("/usr/bin/setsid").exists(),
+    reason="requires setsid to verify escaped descendant cleanup",
+)
+def test_remote_invocation_terminates_descendant_in_separate_session(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".bash_profile").write_text("", encoding="utf-8")
+    pid_file = tmp_path / "escaped.pid"
+    command = [
+        "bash",
+        "-c",
+        f"setsid bash -c 'echo $$ > {pid_file}; sleep 60' & wait",
+    ]
+    wrapper = subprocess.Popen(
+        ["bash", "-c", _remote_invocation("~", "job-1", command)],
+        env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"},
+    )
+    for _ in range(100):
+        if pid_file.exists():
+            break
+        subprocess.run(["sleep", "0.02"], check=True)
+    escaped_pid = int(pid_file.read_text())
+
+    wrapper.terminate()
+    wrapper.wait(timeout=5)
+    for _ in range(100):
+        if subprocess.run(["kill", "-0", str(escaped_pid)], check=False).returncode:
+            break
+        subprocess.run(["sleep", "0.02"], check=True)
+    else:
+        subprocess.run(["kill", "-9", str(escaped_pid)], check=False)
+        pytest.fail(f"descendant {escaped_pid} survived wrapper termination")
+
+
+def test_submit_job_with_log_launches_remote_background(monkeypatch) -> None:
+    calls: list[tuple[list[str], dict]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            "banner\n__PADDLE_SUBMIT__\njob-1\n123\n/home/alice/work\n"
+            "/mnt/jobs/output.log\n",
+            "",
+        )
+
+    monkeypatch.setattr("paddle.submit.subprocess.run", fake_run)
+    monkeypatch.setattr("paddle.submit._job_id", lambda: "job-1")
+    submission = submit_job(
+        "dart1",
+        ["python", "train.py"],
+        cwd="~/work",
+        log="/mnt/jobs/output.log",
+        timeout=7,
+    )
+
+    assert submission == Submission(
+        "job-1",
+        "dart1",
+        123,
+        "/home/alice/work",
+        "/mnt/jobs/output.log",
+        ["python", "train.py"],
+    )
+    remote_arguments = shlex.split(calls[0][0][-1])
+    assert remote_arguments[-2:] == ["python", "train.py"]
+    assert "/mnt/jobs/output.log" in remote_arguments
+    assert "nohup bash -c" in remote_arguments[2]
+    assert calls[0][1] == {
+        "text": True,
+        "capture_output": True,
+        "timeout": 7,
+        "check": False,
+    }
 
 
 def test_transfer_files_copies_contents_and_modes_to_remote_cwd(
@@ -142,6 +287,7 @@ def test_transfer_files_copies_contents_and_modes_to_remote_cwd(
     second_remote = shlex.split(calls[1][0][-1])
     assert first_remote[-3:] == ["~/work", "input.yaml", "640"]
     assert second_remote[-3:] == ["~/work", "run.sh", "755"]
+    assert 'mv -f -- "$temp" "$name"' in first_remote[2]
 
 
 def test_transfer_files_rejects_invalid_duplicate_and_failed_sources(
@@ -182,48 +328,40 @@ def test_transfer_files_rejects_invalid_duplicate_and_failed_sources(
         transfer_files("dart1", [first], cwd="~", timeout=10)
 
 
-def test_submit_job_defaults_log_to_current_local_directory(
-    tmp_path: Path, monkeypatch
-) -> None:
-    class Process:
-        pid = 123
-
-        def wait(self, timeout):
-            return 0
-
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr("paddle.submit._job_id", lambda: "job-1")
-    monkeypatch.setattr(
-        "paddle.submit.subprocess.Popen", lambda *args, **kwargs: Process()
-    )
-
-    submission = submit_job("dart1", ["true"])
-    assert submission.log == str(tmp_path / "job-1.log")
-    assert (tmp_path / "job-1.log").exists()
-
-
-def test_submit_job_reports_start_failure(tmp_path: Path, monkeypatch) -> None:
+def test_submit_job_reports_run_and_submission_failures(monkeypatch) -> None:
     def missing_ssh(*args, **kwargs):
         raise OSError("ssh missing")
 
     monkeypatch.setattr("paddle.submit.subprocess.Popen", missing_ssh)
     with pytest.raises(ValueError, match="ssh missing"):
-        submit_job("dart1", ["true"], log=str(tmp_path / "missing.log"))
+        submit_job("dart1", ["true"])
 
-    class FailedProcess:
-        pid = 123
+    monkeypatch.setattr("paddle.submit.run_foreground", lambda *args, **kwargs: 7)
+    with pytest.raises(ValueError, match="remote command exited 7"):
+        submit_job("dart1", ["false"])
 
-        def wait(self, timeout):
-            return 255
-
-    def failed_ssh(*args, **kwargs):
-        kwargs["stdout"].write("connection refused\n")
-        kwargs["stdout"].flush()
-        return FailedProcess()
-
-    monkeypatch.setattr("paddle.submit.subprocess.Popen", failed_ssh)
+    monkeypatch.setattr(
+        "paddle.submit.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 255, "", "connection refused\n"
+        ),
+    )
     with pytest.raises(ValueError, match="connection refused"):
-        submit_job("dart1", ["true"], log=str(tmp_path / "failed.log"))
+        submit_job("dart1", ["true"], log="job.log")
+
+    monkeypatch.setattr(
+        "paddle.submit.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "hello\n", ""),
+    )
+    with pytest.raises(ValueError, match="invalid submission response"):
+        submit_job("dart1", ["true"], log="job.log")
+
+    def timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired("ssh", 2)
+
+    monkeypatch.setattr("paddle.submit.subprocess.run", timeout)
+    with pytest.raises(ValueError, match="submission timed out after 2s"):
+        submit_job("dart1", ["true"], log="job.log", timeout=2)
 
 
 def test_submission_json_contains_receipt() -> None:
@@ -324,6 +462,35 @@ def test_submit_main_accepts_repeated_files(tmp_path: Path, monkeypatch) -> None
         == 0
     )
     assert calls[0]["files"] == [first, second]
+
+
+def test_submit_main_without_log_reports_completion(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    nodelist = tmp_path / "nodes"
+    nodelist.write_text("dart1\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "paddle.submit.submit_job",
+        lambda host, command, **kwargs: Submission(
+            "job-1", host, None, "~", None, list(command)
+        ),
+    )
+
+    assert main(["dart1", "--nodelist", str(nodelist), "--", "true"]) == 0
+    assert "Completed job-1 on dart1" in capsys.readouterr().out
+
+
+def test_submit_main_returns_130_on_keyboard_interrupt(
+    tmp_path: Path, monkeypatch
+) -> None:
+    nodelist = tmp_path / "nodes"
+    nodelist.write_text("dart1\n", encoding="utf-8")
+
+    def interrupt(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("paddle.submit.submit_job", interrupt)
+    assert main(["dart1", "--nodelist", str(nodelist), "--", "sleep", "60"]) == 130
 
 
 def test_submit_main_rejects_unknown_host_missing_command_and_bad_timeout(

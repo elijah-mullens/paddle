@@ -23,7 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "submit",
         add_help=False,
-        help="Submit a detached command to a machine in the nodelist.",
+        help="Run a command on a machine in the nodelist.",
     )
     return parser
 
