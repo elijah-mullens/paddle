@@ -29,11 +29,11 @@ cpu  100 0 50 850 0 0 0 0 0 0
 __CPU1__
 cpu  120 0 60 920 0 0 0 0 0 0
 __CPU_PROCESSES__
-alice 123 75.0 4.0 python
-root 1 0.1 0.2 systemd
-__PID_USERS__
-123 alice
-1 root
+alice 123 75.0 4.0 python train.py --epochs 10
+root 1 0.1 0.2 /usr/lib/systemd/systemd --system
+__PID_DETAILS__
+123 alice python train.py --epochs 10
+1 root /usr/lib/systemd/systemd --system
 __DISKS__
 Filesystem 1-blocks Used Available Capacity Mounted on
 /dev/mapper/root 1000 600 400 60% /
@@ -77,9 +77,11 @@ def test_parse_probe_output_collects_cpu_gpu_processes_and_local_disks() -> None
     assert [(process.user, process.pid) for process in metric.cpu_processes] == [
         ("alice", 123)
     ]
+    assert metric.cpu_processes[0].command == "python train.py --epochs 10"
     assert len(metric.gpus) == 1
     assert metric.gpus[0].name == "NVIDIA A100"
     assert metric.gpus[0].processes[0].user == "alice"
+    assert metric.gpus[0].processes[0].command == "python train.py --epochs 10"
     assert [(disk.source, disk.mount) for disk in metric.disks] == [
         ("/dev/mapper/root", "/")
     ]

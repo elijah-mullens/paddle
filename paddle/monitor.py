@@ -25,9 +25,9 @@ sleep 0.2
 echo __CPU1__
 head -n 1 /proc/stat
 echo __CPU_PROCESSES__
-LC_ALL=C ps -eo user=,pid=,pcpu=,pmem=,comm= --sort=-pcpu
-echo __PID_USERS__
-LC_ALL=C ps -eo pid=,user=
+LC_ALL=C ps -eo user=,pid=,pcpu=,pmem=,args= --sort=-pcpu
+echo __PID_DETAILS__
+LC_ALL=C ps -eo pid=,user=,args=
 echo __DISKS__
 LC_ALL=C df -P -B1 -l
 echo __GPUS__
@@ -158,7 +158,7 @@ def _sections(output: str) -> dict[str, list[str]]:
 
 def parse_probe_output(host: str, output: str, top: int) -> HostMetric:
     sections = _sections(output)
-    required = {"CPU0", "CPU1", "CPU_PROCESSES", "PID_USERS", "DISKS", "GPUS"}
+    required = {"CPU0", "CPU1", "CPU_PROCESSES", "PID_DETAILS", "DISKS", "GPUS"}
     missing = sorted(required - sections.keys())
     if missing:
         raise ValueError(f"incomplete probe output; missing {', '.join(missing)}")
@@ -175,24 +175,30 @@ def parse_probe_output(host: str, output: str, top: int) -> HostMetric:
             ProcessMetric(user, int(pid), float(cpu), float(memory), command)
         )
 
-    pid_users: dict[int, str] = {}
-    for line in sections["PID_USERS"]:
-        fields = line.split(None, 1)
-        if len(fields) == 2:
-            pid_users[int(fields[0])] = fields[1]
+    pid_details: dict[int, tuple[str, str]] = {}
+    for line in sections["PID_DETAILS"]:
+        fields = line.split(None, 2)
+        if len(fields) >= 2:
+            pid_details[int(fields[0])] = (
+                fields[1],
+                fields[2] if len(fields) == 3 else "",
+            )
 
     gpu_processes: list[GPUProcessMetric] = []
     for row in csv.reader(sections.get("GPU_PROCESSES", []), skipinitialspace=True):
         if len(row) != 4:
             continue
-        uuid, pid, command, memory = row
+        uuid, pid, process_name, memory = row
         process_pid = int(pid)
+        user, full_command = pid_details.get(
+            process_pid, ("?", process_name.strip())
+        )
         gpu_processes.append(
             GPUProcessMetric(
                 uuid.strip(),
                 process_pid,
-                pid_users.get(process_pid, "?"),
-                command.strip(),
+                user,
+                full_command,
                 int(_number(memory, int)),
             )
         )
