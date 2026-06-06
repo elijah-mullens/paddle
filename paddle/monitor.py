@@ -332,7 +332,9 @@ def render_snapshot(snapshot: MonitorSnapshot) -> Table:
             summary.add_row(host.host, "-", "-", "-", "-", f"[red]{host.error}[/red]")
             continue
         fullest = max(host.disks, key=lambda disk: disk.usage_percent, default=None)
-        gpu_util = ", ".join(f"{gpu.index}:{gpu.utilization_percent}%" for gpu in host.gpus)
+        gpu_util = ", ".join(
+            f"{gpu.index}: {gpu.utilization_percent}%" for gpu in host.gpus
+        )
         gpu_memory_values = ", ".join(
             f"{gpu.index}:{gpu.memory_used_mib}/{gpu.memory_total_mib} MiB"
             for gpu in host.gpus
