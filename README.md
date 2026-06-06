@@ -198,6 +198,39 @@ collected when `nvidia-smi` is available. Nodes are probed concurrently using
 multiple threads. Individual unreachable machines are reported without
 preventing collection from the remaining nodes.
 
+## Submit Jobs to Remote Machines
+
+`paddle submit` starts a detached command on an explicitly selected machine
+from the same nodelist used by `paddle monitor`:
+
+```bash
+paddle submit dart1 -- python train.py --epochs 10
+paddle submit dart1 --cwd ~/work -- python train.py
+paddle submit dart1 --log ./train.log --json -- python train.py
+paddle submit dart1 --file train.py --file input.yaml -- python train.py
+paddle submit dart1 --nodelist path/to/nodelist --timeout 15 -- ./run.sh
+```
+
+The command validates that the host is in the nodelist and connects using
+password-less SSH. Without `--log`, the command runs in the foreground and its
+output is displayed in the submitting terminal. Pressing Ctrl-C terminates the
+SSH connection and terminates the remote foreground command's process group and
+descendant processes. With `--log REMOTE_PATH`, the command runs in the remote
+background, writes output to that remote path, and reports its remote PID.
+
+Jobs run from the remote home directory by default; use `--cwd` to select
+another remote directory. Before executing the command, the remote launcher
+sources `${HOME}/.bash_profile`, including aliases when their startup scripts
+permit non-interactive use. Arguments after `--` are executed literally; use
+an explicit shell command such as
+`sh -lc 'python train.py | tee summary.txt'` when pipes, redirects, or other
+shell expressions are needed.
+
+Repeat `--file PATH` to copy local regular files into the remote working
+directory before execution. Each file keeps its local permission bits and is
+placed under its basename, atomically replacing an existing remote file with
+the same name. Directories and duplicate basenames are rejected.
+
 ## Troubleshooting
 
 1. If you have Docker installed but do not have Docker Compose, remove your current Docker installation, which could be docker or docker.io, and re-install it following the guide provided in the [Develop with Docker](#develop-with-docker) section above.
