@@ -170,6 +170,33 @@ Source-build fallback:
 export PATH="$HOME/.local/tempestremap/bin:$PATH"
 ```
 
+## Monitor Remote Machines
+
+`paddle monitor` displays CPU, GPU, process, and local disk usage for a list of
+machines accessible through password-less SSH.
+
+Create `~/.config/paddle/nodelist` with one SSH host or alias per line:
+
+```text
+# Dart workstations
+dart1
+dart2
+dart3
+```
+
+Run a snapshot, continuously refresh the display, or emit JSON:
+
+```bash
+paddle monitor
+paddle monitor --watch 5
+paddle monitor --json
+paddle monitor --nodelist path/to/nodelist --top 10 --timeout 15
+```
+
+The remote machines need standard Linux tools and `/proc`. GPU metrics are
+collected when `nvidia-smi` is available. Individual unreachable machines are
+reported without preventing collection from the remaining nodes.
+
 ## Troubleshooting
 
 1. If you have Docker installed but do not have Docker Compose, remove your current Docker installation, which could be docker or docker.io, and re-install it following the guide provided in the [Develop with Docker](#develop-with-docker) section above.

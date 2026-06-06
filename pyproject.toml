@@ -34,7 +34,8 @@ dependencies = [
   "torch>=2.7.0",
   "snapy>=1.3.5",
   "scipy",
-  "netCDF4"
+  "netCDF4",
+  "rich>=13"
 ]
 
 [project.optional-dependencies]
