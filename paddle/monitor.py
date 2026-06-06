@@ -336,7 +336,7 @@ def render_snapshot(snapshot: MonitorSnapshot) -> Table:
             f"{gpu.index}: {gpu.utilization_percent}%" for gpu in host.gpus
         )
         gpu_memory_values = ", ".join(
-            f"{gpu.index}:{gpu.memory_used_mib}/{gpu.memory_total_mib} MiB"
+            f"{gpu.index}: {gpu.memory_used_mib}/{gpu.memory_total_mib} MiB"
             for gpu in host.gpus
         )
         gpu_zero = next((gpu for gpu in host.gpus if gpu.index == 0), None)

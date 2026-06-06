@@ -154,7 +154,7 @@ def test_snapshot_json_and_render_include_metrics() -> None:
     assert "dart1" in rendered
     assert "12.5%" in rendered
     assert "0: 50%" in rendered
-    assert "NVIDIA A100 | 0:100/1000 MiB" in rendered
+    assert "NVIDIA A100 | 0: 100/1000 MiB" in rendered
     assert "/dev/root" in rendered
 
 
