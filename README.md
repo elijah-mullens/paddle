@@ -198,6 +198,25 @@ collected when `nvidia-smi` is available. Nodes are probed concurrently using
 multiple threads. Individual unreachable machines are reported without
 preventing collection from the remaining nodes.
 
+## Submit Jobs to Remote Machines
+
+`paddle submit` starts a detached command on an explicitly selected machine
+from the same nodelist used by `paddle monitor`:
+
+```bash
+paddle submit dart1 -- python train.py --epochs 10
+paddle submit dart1 --cwd ~/work -- python train.py
+paddle submit dart1 --log ~/logs/train.log --json -- python train.py
+paddle submit dart1 --nodelist path/to/nodelist --timeout 15 -- ./run.sh
+```
+
+The command validates that the host is in the nodelist, connects using
+password-less SSH, and prints the remote PID and log path. Jobs run from the
+remote home directory by default and write logs under
+`~/.local/state/paddle/jobs`. Arguments after `--` are executed literally; use
+an explicit shell command such as `sh -lc 'python train.py | tee summary.txt'`
+when pipes, redirects, or other shell expressions are needed.
+
 ## Troubleshooting
 
 1. If you have Docker installed but do not have Docker Compose, remove your current Docker installation, which could be docker or docker.io, and re-install it following the guide provided in the [Develop with Docker](#develop-with-docker) section above.
