@@ -190,9 +190,7 @@ def parse_probe_output(host: str, output: str, top: int) -> HostMetric:
             continue
         uuid, pid, process_name, memory = row
         process_pid = int(pid)
-        user, full_command = pid_details.get(
-            process_pid, ("?", process_name.strip())
-        )
+        user, full_command = pid_details.get(process_pid, ("?", process_name.strip()))
         gpu_processes.append(
             GPUProcessMetric(
                 uuid.strip(),
@@ -295,7 +293,9 @@ def collect_snapshot(
 ) -> MonitorSnapshot:
     metrics: dict[str, HostMetric] = {}
     with ThreadPoolExecutor(max_workers=min(32, len(hosts))) as executor:
-        futures = {executor.submit(collector, host, timeout, top): host for host in hosts}
+        futures = {
+            executor.submit(collector, host, timeout, top): host for host in hosts
+        }
         for future in as_completed(futures):
             host = futures[future]
             try:
