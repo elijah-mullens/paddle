@@ -39,6 +39,31 @@ printf -v command_line '%q ' "$@"
 eval "$command_line"
 """
 
+REMOTE_RECEIVE_FILE = r"""
+set -eu
+
+cwd=$1
+name=$2
+mode=$3
+
+case "$cwd" in
+  "~") cwd=$HOME ;;
+  "~/"*) cwd=$HOME/${cwd#~/} ;;
+esac
+
+if ! cd -- "$cwd"; then
+  echo "cannot use remote working directory: $cwd" >&2
+  exit 3
+fi
+
+temp=".paddle-transfer.$$"
+trap 'rm -f -- "$temp"' EXIT
+cat > "$temp"
+chmod "$mode" "$temp"
+mv -f -- "$temp" "$name"
+trap - EXIT
+"""
+
 
 @dataclass
 class Submission:
@@ -50,11 +75,15 @@ class Submission:
     command: list[str]
 
 
-def _remote_invocation(cwd: str, command: Sequence[str]) -> str:
-    arguments = ["bash", cwd, *command]
+def _bash_invocation(script: str, arguments: Sequence[str]) -> str:
+    positional = ["bash", *arguments]
     return "bash -c " + " ".join(
-        shlex.quote(argument) for argument in [REMOTE_RUN, *arguments]
+        shlex.quote(argument) for argument in [script, *positional]
     )
+
+
+def _remote_invocation(cwd: str, command: Sequence[str]) -> str:
+    return _bash_invocation(REMOTE_RUN, [cwd, *command])
 
 
 def _last_error(log: Path, fallback: str) -> str:
@@ -77,6 +106,55 @@ def _local_log_path(log: str, job_id: str) -> Path:
     return path.resolve()
 
 
+def _ssh_command(host: str, timeout: float, remote_command: str) -> list[str]:
+    return [
+        "ssh",
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        f"ConnectTimeout={max(1, int(timeout))}",
+        "--",
+        host,
+        remote_command,
+    ]
+
+
+def transfer_files(
+    host: str,
+    files: Sequence[Path],
+    *,
+    cwd: str,
+    timeout: float,
+) -> None:
+    destinations: set[str] = set()
+    sources: list[tuple[Path, str]] = []
+    for raw_path in files:
+        path = raw_path.expanduser().resolve()
+        if not path.is_file():
+            raise ValueError(f"transfer source is not a regular file: {raw_path}")
+        if path.name in destinations:
+            raise ValueError(f"multiple transfer files have basename {path.name!r}")
+        destinations.add(path.name)
+        sources.append((path, f"{path.stat().st_mode & 0o777:o}"))
+
+    for path, mode in sources:
+        remote_command = _bash_invocation(REMOTE_RECEIVE_FILE, [cwd, path.name, mode])
+        try:
+            with path.open("rb") as source:
+                result = subprocess.run(
+                    _ssh_command(host, timeout, remote_command),
+                    stdin=source,
+                    capture_output=True,
+                    check=False,
+                )
+        except OSError as exc:
+            raise ValueError(f"cannot transfer {path}: {exc}") from exc
+        if result.returncode != 0:
+            lines = result.stderr.decode(errors="replace").strip().splitlines()
+            error = lines[-1] if lines else f"SSH exited {result.returncode}"
+            raise ValueError(f"cannot transfer {path}: {error}")
+
+
 def submit_job(
     host: str,
     command: Sequence[str],
@@ -84,7 +162,10 @@ def submit_job(
     cwd: str = "~",
     log: str = "",
     timeout: float = 10.0,
+    files: Sequence[Path] = (),
 ) -> Submission:
+    transfer_files(host, files, cwd=cwd, timeout=timeout)
+
     job_id = _job_id()
     local_log = _local_log_path(log, job_id)
     try:
@@ -93,16 +174,7 @@ def submit_job(
     except OSError as exc:
         raise ValueError(f"cannot create local log {local_log}: {exc}") from exc
 
-    ssh_command = [
-        "ssh",
-        "-o",
-        "BatchMode=yes",
-        "-o",
-        f"ConnectTimeout={max(1, int(timeout))}",
-        "--",
-        host,
-        _remote_invocation(cwd, command),
-    ]
+    ssh_command = _ssh_command(host, timeout, _remote_invocation(cwd, command))
     try:
         process = subprocess.Popen(
             ssh_command,
@@ -154,6 +226,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Local log path (default: generated in the current local directory).",
     )
     parser.add_argument(
+        "--file",
+        action="append",
+        type=Path,
+        default=[],
+        help="Local file to copy into the remote working directory; repeatable.",
+    )
+    parser.add_argument(
         "--timeout", type=float, default=10.0, help="SSH connection timeout in seconds."
     )
     parser.add_argument(
@@ -194,6 +273,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             cwd=args.cwd,
             log=args.log,
             timeout=args.timeout,
+            files=args.file,
         )
     except ValueError as exc:
         parser.error(str(exc))

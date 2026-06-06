@@ -14,6 +14,7 @@ from paddle.submit import (
     main,
     submission_json,
     submit_job,
+    transfer_files,
 )
 
 
@@ -54,6 +55,7 @@ def test_remote_invocation_expands_alias_from_bash_profile(tmp_path: Path) -> No
 
 def test_submit_job_streams_to_local_log(tmp_path: Path, monkeypatch) -> None:
     calls: list[tuple[list[str], dict]] = []
+    transfers: list[tuple[str, list[Path], str, float]] = []
 
     class Process:
         pid = 123
@@ -67,14 +69,23 @@ def test_submit_job_streams_to_local_log(tmp_path: Path, monkeypatch) -> None:
 
     monkeypatch.setattr("paddle.submit.subprocess.Popen", fake_popen)
     monkeypatch.setattr("paddle.submit._job_id", lambda: "job-1")
+    monkeypatch.setattr(
+        "paddle.submit.transfer_files",
+        lambda host, files, *, cwd, timeout: transfers.append(
+            (host, list(files), cwd, timeout)
+        ),
+    )
+    source = tmp_path / "input.yaml"
     submission = submit_job(
         "dart1",
         ["python", "train.py", "--epochs", "2"],
         cwd="~/work",
         log=str(tmp_path / "job.log"),
         timeout=7,
+        files=[source],
     )
 
+    assert transfers == [("dart1", [source], "~/work", 7)]
     assert submission == Submission(
         "job-1",
         "dart1",
@@ -103,6 +114,72 @@ def test_submit_job_streams_to_local_log(tmp_path: Path, monkeypatch) -> None:
     assert options["stderr"] == subprocess.STDOUT
     assert options["start_new_session"] is True
     assert options["stdout"].name == str(tmp_path / "job.log")
+
+
+def test_transfer_files_copies_contents_and_modes_to_remote_cwd(
+    tmp_path: Path, monkeypatch
+) -> None:
+    first = tmp_path / "input.yaml"
+    first.write_bytes(b"input: value\n")
+    first.chmod(0o640)
+    second = tmp_path / "run.sh"
+    second.write_bytes(b"#!/bin/bash\ntrue\n")
+    second.chmod(0o755)
+    calls: list[tuple[list[str], dict, bytes]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs, kwargs["stdin"].read()))
+        return subprocess.CompletedProcess(command, 0, b"", b"banner\n")
+
+    monkeypatch.setattr("paddle.submit.subprocess.run", fake_run)
+    transfer_files("dart1", [first, second], cwd="~/work", timeout=7)
+
+    assert [contents for _, _, contents in calls] == [
+        b"input: value\n",
+        b"#!/bin/bash\ntrue\n",
+    ]
+    first_remote = shlex.split(calls[0][0][-1])
+    second_remote = shlex.split(calls[1][0][-1])
+    assert first_remote[-3:] == ["~/work", "input.yaml", "640"]
+    assert second_remote[-3:] == ["~/work", "run.sh", "755"]
+
+
+def test_transfer_files_rejects_invalid_duplicate_and_failed_sources(
+    tmp_path: Path, monkeypatch
+) -> None:
+    with pytest.raises(ValueError, match="not a regular file"):
+        transfer_files("dart1", [tmp_path / "missing"], cwd="~", timeout=10)
+
+    first_dir = tmp_path / "first"
+    second_dir = tmp_path / "second"
+    first_dir.mkdir()
+    second_dir.mkdir()
+    first = first_dir / "input.yaml"
+    second = second_dir / "input.yaml"
+    first.write_text("first", encoding="utf-8")
+    second.write_text("second", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    def successful_transfer(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, b"", b"")
+
+    monkeypatch.setattr(
+        "paddle.submit.subprocess.run",
+        successful_transfer,
+    )
+    with pytest.raises(ValueError, match="basename 'input.yaml'"):
+        transfer_files("dart1", [first, second], cwd="~", timeout=10)
+    assert calls == []
+
+    monkeypatch.setattr(
+        "paddle.submit.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 1, b"", b"permission denied\n"
+        ),
+    )
+    with pytest.raises(ValueError, match="permission denied"):
+        transfer_files("dart1", [first], cwd="~", timeout=10)
 
 
 def test_submit_job_defaults_log_to_current_local_directory(
@@ -195,7 +272,7 @@ def test_submit_main_validates_nodelist_and_emits_json(
         (
             "dart1",
             ["python", "train.py", "--epochs", "2"],
-            {"cwd": "~/work", "log": "", "timeout": 10.0},
+            {"cwd": "~/work", "log": "", "timeout": 10.0, "files": []},
         )
     ]
     assert json.loads(capsys.readouterr().out)["job_id"] == "job-1"
@@ -213,7 +290,40 @@ def test_submit_main_defaults_to_remote_home(tmp_path: Path, monkeypatch) -> Non
     )
 
     assert main(["dart1", "--nodelist", str(nodelist), "--", "true"]) == 0
-    assert calls == [{"cwd": "~", "log": "", "timeout": 10.0}]
+    assert calls == [{"cwd": "~", "log": "", "timeout": 10.0, "files": []}]
+
+
+def test_submit_main_accepts_repeated_files(tmp_path: Path, monkeypatch) -> None:
+    nodelist = tmp_path / "nodes"
+    nodelist.write_text("dart1\n", encoding="utf-8")
+    first = tmp_path / "input.yaml"
+    second = tmp_path / "run.py"
+    calls: list[dict] = []
+
+    monkeypatch.setattr(
+        "paddle.submit.submit_job",
+        lambda host, command, **kwargs: calls.append(kwargs)
+        or Submission("job-1", host, 123, "~", "/log", list(command)),
+    )
+
+    assert (
+        main(
+            [
+                "dart1",
+                "--nodelist",
+                str(nodelist),
+                "--file",
+                str(first),
+                "--file",
+                str(second),
+                "--",
+                "python",
+                "run.py",
+            ]
+        )
+        == 0
+    )
+    assert calls[0]["files"] == [first, second]
 
 
 def test_submit_main_rejects_unknown_host_missing_command_and_bad_timeout(

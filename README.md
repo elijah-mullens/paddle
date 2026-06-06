@@ -207,6 +207,7 @@ from the same nodelist used by `paddle monitor`:
 paddle submit dart1 -- python train.py --epochs 10
 paddle submit dart1 --cwd ~/work -- python train.py
 paddle submit dart1 --log ./train.log --json -- python train.py
+paddle submit dart1 --file train.py --file input.yaml -- python train.py
 paddle submit dart1 --nodelist path/to/nodelist --timeout 15 -- ./run.sh
 ```
 
@@ -221,6 +222,10 @@ SSH connection is interrupted. Arguments after `--` are executed literally;
 use an explicit shell command such as
 `sh -lc 'python train.py | tee summary.txt'` when pipes, redirects, or other
 shell expressions are needed.
+
+Repeat `--file PATH` to copy local regular files into the remote working
+directory before execution. Each file keeps its local permission bits and is
+placed under its basename; directories and duplicate basenames are rejected.
 
 ## Troubleshooting
 
