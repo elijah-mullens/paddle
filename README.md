@@ -194,8 +194,9 @@ paddle monitor --nodelist path/to/nodelist --top 10 --timeout 15
 ```
 
 The remote machines need standard Linux tools and `/proc`. GPU metrics are
-collected when `nvidia-smi` is available. Individual unreachable machines are
-reported without preventing collection from the remaining nodes.
+collected when `nvidia-smi` is available. Nodes are probed concurrently using
+multiple threads. Individual unreachable machines are reported without
+preventing collection from the remaining nodes.
 
 ## Troubleshooting
 

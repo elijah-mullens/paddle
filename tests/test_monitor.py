@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import subprocess
+import threading
 
 import pytest
 from rich.console import Console
@@ -131,6 +132,17 @@ def test_collect_snapshot_preserves_nodelist_order_and_failures() -> None:
     snapshot = collect_snapshot(["good", "bad"], 1, 2, collector=collector)
     assert [host.host for host in snapshot.hosts] == ["good", "bad"]
     assert snapshot.hosts[1].error == "failed"
+
+
+def test_collect_snapshot_probes_hosts_concurrently() -> None:
+    barrier = threading.Barrier(3, timeout=1)
+
+    def collector(host: str, timeout: float, top: int) -> HostMetric:
+        barrier.wait()
+        return HostMetric(host, "ok", cpu_percent=1.0)
+
+    snapshot = collect_snapshot(["dart1", "dart2", "dart3"], 1, 2, collector=collector)
+    assert [host.host for host in snapshot.hosts] == ["dart1", "dart2", "dart3"]
 
 
 def test_snapshot_json_and_render_include_metrics() -> None:
