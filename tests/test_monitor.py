@@ -141,7 +141,7 @@ def test_snapshot_json_and_render_include_metrics() -> None:
                 "dart1",
                 "ok",
                 cpu_percent=12.5,
-                gpus=[GPUMetric(0, "uuid", "GPU", 50, 100, 1000, 60)],
+                gpus=[GPUMetric(0, "uuid", "NVIDIA A100", 50, 100, 1000, 60)],
                 disks=[DiskMetric("/dev/root", "/", 50, 100, 50, 50)],
             )
         ],
@@ -153,6 +153,7 @@ def test_snapshot_json_and_render_include_metrics() -> None:
     rendered = console.export_text()
     assert "dart1" in rendered
     assert "12.5%" in rendered
+    assert "NVIDIA A100 | 0:100/1000 MiB" in rendered
     assert "/dev/root" in rendered
 
 
