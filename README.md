@@ -206,16 +206,21 @@ from the same nodelist used by `paddle monitor`:
 ```bash
 paddle submit dart1 -- python train.py --epochs 10
 paddle submit dart1 --cwd ~/work -- python train.py
-paddle submit dart1 --log ~/logs/train.log --json -- python train.py
+paddle submit dart1 --log ./train.log --json -- python train.py
 paddle submit dart1 --nodelist path/to/nodelist --timeout 15 -- ./run.sh
 ```
 
 The command validates that the host is in the nodelist, connects using
-password-less SSH, and prints the remote PID and log path. Jobs run from the
-remote home directory by default and write logs under
-`~/.local/state/paddle/jobs`. Arguments after `--` are executed literally; use
-an explicit shell command such as `sh -lc 'python train.py | tee summary.txt'`
-when pipes, redirects, or other shell expressions are needed.
+password-less SSH, and prints the local SSH transport PID and local log path.
+Jobs run from the remote home directory by default; use `--cwd` to select
+another remote directory. The detached local SSH process streams the remote
+command's output into a log in the submitting machine's current directory by
+default. Before executing the command, the remote launcher sources
+`${HOME}/.bash_profile`, including aliases such as `ll`. The job ends if that
+SSH connection is interrupted. Arguments after `--` are executed literally;
+use an explicit shell command such as
+`sh -lc 'python train.py | tee summary.txt'` when pipes, redirects, or other
+shell expressions are needed.
 
 ## Troubleshooting
 

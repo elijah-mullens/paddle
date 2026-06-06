@@ -2,54 +2,41 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import shlex
 import subprocess
 import sys
 from typing import Sequence
+from uuid import uuid4
 
 from .nodes import DEFAULT_NODELIST, read_nodelist
 
 
-REMOTE_SUBMIT = r"""
-set -eu
-
+REMOTE_RUN = r"""
 cwd=$1
-log=$2
-shift 2
+shift
+
+shopt -s expand_aliases
+if ! source "${HOME}/.bash_profile"; then
+  echo "cannot source remote bash profile: ${HOME}/.bash_profile" >&2
+  exit 2
+fi
+set -eu
 
 case "$cwd" in
   "~") cwd=$HOME ;;
   "~/"*) cwd=$HOME/${cwd#~/} ;;
-esac
-case "$log" in
-  "~") log=$HOME ;;
-  "~/"*) log=$HOME/${log#~/} ;;
 esac
 
 if ! cd -- "$cwd"; then
   echo "cannot use remote working directory: $cwd" >&2
   exit 3
 fi
-cwd=$(pwd -P)
-job_id=$(date -u +%Y%m%dT%H%M%SZ)-$$
-if [ -z "$log" ]; then
-  log=$HOME/.local/state/paddle/jobs/$job_id.log
-fi
-case "$log" in
-  /*) ;;
-  *) log=$cwd/$log ;;
-esac
-log_dir=$(dirname -- "$log")
-if ! mkdir -p -- "$log_dir"; then
-  echo "cannot create remote log directory: $log_dir" >&2
-  exit 4
-fi
 
-nohup "$@" >"$log" 2>&1 </dev/null &
-pid=$!
-printf '%s\n' "__PADDLE_SUBMIT__" "$job_id" "$pid" "$cwd" "$log"
+printf -v command_line '%q ' "$@"
+eval "$command_line"
 """
 
 
@@ -63,14 +50,31 @@ class Submission:
     command: list[str]
 
 
-def _remote_invocation(cwd: str, log: str, command: Sequence[str]) -> str:
-    arguments = [cwd, log, *command]
-    return "sh -s -- " + " ".join(shlex.quote(argument) for argument in arguments)
+def _remote_invocation(cwd: str, command: Sequence[str]) -> str:
+    arguments = ["bash", cwd, *command]
+    return "bash -c " + " ".join(
+        shlex.quote(argument) for argument in [REMOTE_RUN, *arguments]
+    )
 
 
-def _last_error(stderr: str, fallback: str) -> str:
-    lines = stderr.strip().splitlines()
+def _last_error(log: Path, fallback: str) -> str:
+    try:
+        lines = log.read_text(encoding="utf-8", errors="replace").strip().splitlines()
+    except OSError:
+        lines = []
     return lines[-1] if lines else fallback
+
+
+def _job_id() -> str:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return f"{timestamp}-{uuid4().hex[:8]}"
+
+
+def _local_log_path(log: str, job_id: str) -> Path:
+    path = Path(log).expanduser() if log else Path.cwd() / f"{job_id}.log"
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    return path.resolve()
 
 
 def submit_job(
@@ -81,6 +85,14 @@ def submit_job(
     log: str = "",
     timeout: float = 10.0,
 ) -> Submission:
+    job_id = _job_id()
+    local_log = _local_log_path(log, job_id)
+    try:
+        local_log.parent.mkdir(parents=True, exist_ok=True)
+        log_handle = local_log.open("w", encoding="utf-8")
+    except OSError as exc:
+        raise ValueError(f"cannot create local log {local_log}: {exc}") from exc
+
     ssh_command = [
         "ssh",
         "-o",
@@ -89,38 +101,30 @@ def submit_job(
         f"ConnectTimeout={max(1, int(timeout))}",
         "--",
         host,
-        _remote_invocation(cwd, log, command),
+        _remote_invocation(cwd, command),
     ]
     try:
-        result = subprocess.run(
+        process = subprocess.Popen(
             ssh_command,
-            input=REMOTE_SUBMIT,
-            text=True,
-            capture_output=True,
-            timeout=timeout,
-            check=False,
+            stdin=subprocess.DEVNULL,
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
         )
-    except subprocess.TimeoutExpired as exc:
-        raise ValueError(f"SSH submission timed out after {timeout:g}s") from exc
     except OSError as exc:
+        log_handle.close()
         raise ValueError(str(exc)) from exc
+    finally:
+        log_handle.close()
 
-    if result.returncode != 0:
-        raise ValueError(_last_error(result.stderr, f"SSH exited {result.returncode}"))
-
-    lines = result.stdout.splitlines()
     try:
-        marker = len(lines) - 1 - lines[::-1].index("__PADDLE_SUBMIT__")
-        job_id, pid, remote_cwd, remote_log = lines[marker + 1 : marker + 5]
-        if not job_id or not remote_cwd or not remote_log:
-            raise ValueError
-        remote_pid = int(pid)
-    except (ValueError, IndexError):
-        raise ValueError(
-            "remote host returned an invalid submission response"
-        ) from None
+        returncode = process.wait(timeout=0.1)
+    except subprocess.TimeoutExpired:
+        returncode = None
+    if returncode not in {None, 0}:
+        raise ValueError(_last_error(local_log, f"SSH exited {returncode}"))
 
-    return Submission(job_id, host, remote_pid, remote_cwd, remote_log, list(command))
+    return Submission(job_id, host, process.pid, cwd, str(local_log), list(command))
 
 
 def submission_json(submission: Submission) -> str:
@@ -147,10 +151,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--log",
         default="",
-        help="Remote log path (default: generated under ~/.local/state/paddle/jobs).",
+        help="Local log path (default: generated in the current local directory).",
     )
     parser.add_argument(
-        "--timeout", type=float, default=10.0, help="SSH startup timeout in seconds."
+        "--timeout", type=float, default=10.0, help="SSH connection timeout in seconds."
     )
     parser.add_argument(
         "--json", action="store_true", help="Print the submission as JSON."
@@ -197,11 +201,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.json:
         print(submission_json(submission))
     else:
-        print(
-            f"Submitted {submission.job_id} to {submission.host} (PID {submission.pid})"
-        )
-        print(f"Working directory: {submission.cwd}")
-        print(f"Log: {submission.log}")
+        print(f"Submitted {submission.job_id} to {submission.host}")
+        print(f"Local SSH PID: {submission.pid}")
+        print(f"Remote working directory: {submission.cwd}")
+        print(f"Local log: {submission.log}")
     return 0
 
 
