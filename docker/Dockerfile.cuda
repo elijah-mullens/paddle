@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       gcc g++ gfortran \
       ninja-build \
       cmake \
+      openssh-client \
       git curl ca-certificates \
       python3 python3-pip python3-venv python3-dev \
       pkg-config \
@@ -33,8 +34,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       nodejs npm \
       libnetcdf-dev nco ncview \
       && rm -rf /var/lib/apt/lists/*
-
-#RUN apt-get install libnccl2 libnccl-dev
 
 # Make fd available as `fd` (Ubuntu calls it fdfind)
 RUN update-alternatives --install /usr/bin/fd fd /usr/bin/fdfind 50
@@ -229,13 +228,6 @@ WORKDIR /workspace
 RUN python -m pip install paddle --no-deps
 
 ############################
-# Install pyminichem
-############################
-WORKDIR /workspace
-
-RUN python -m pip install pyminichem==${PYMINICHEM_VER} --no-deps
-
-############################
 # Install nvfortran library
 ############################
 ARG NVHPC_VER=23.9
@@ -249,19 +241,43 @@ RUN echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] 
 
 RUN apt update && apt install -y nvhpc-${NVHPC_TAG}
 
-RUN rm -rf \
-    /usr/share/doc \
-    /usr/share/man \
-    /usr/share/info \
-    /usr/share/licenses \
-    /opt/nvidia/hpc_sdk/Linux_x86_64/${NVHPC_VERSION}/examples \
-    /opt/nvidia/hpc_sdk/Linux_x86_64/${NVHPC_VERSION}/documentation
-
-ENV NVHPC_HOME=/opt/nvidia/hpc_sdk/Linux_x86_64/${NVHPC_VERSION}/compilers
-ENV CUDA_HOME=/usr/local/cuda-"${CUDA_VER%.*}"
+ENV NVHPC_HOME=/opt/nvidia/hpc_sdk/Linux_x86_64/${NVHPC_VER}/compilers
+ENV CUDA_HOME=/usr/local/cuda-11.8
 ENV CUDA_PATH=${CUDA_HOME}
 ENV PATH=${CUDA_HOME}/bin:${NVHPC_HOME}/bin:${PATH}
 ENV LD_LIBRARY_PATH=${NVHPC_HOME}/lib:${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+ENV CUDAToolkit_ROOT=$CUDA_HOME
+ENV NVCC=${CUDA_HOME}/bin/nvcc
+ENV CUDACXX=${NVCC}
+ENV CC=gcc
+ENV CXX=g++
+ENV FC=nvfortran
+ENV F77=${FC}
+
+############################
+# Install pyminichem
+############################
+WORKDIR /workspace
+
+RUN mkdir -p -m 0700 ~/.ssh && \
+    ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+RUN --mount=type=ssh \
+  set -eu pipefail; \
+  if [ ! -d "pyminichem/.git" ]; then \
+    rm -rf pyminichem; \
+    git clone --filter=blob:none --depth 1 --no-single-branch \
+      git@github.com:chengcli/pyminichem.git pyminichem; \
+  fi; \
+  cd pyminichem; \
+  git fetch --force --tags --prune --depth 1; \
+  git checkout -f "${PYMINICHEM_VER}"; \
+  cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
+  cmake --build build --parallel "$(nproc)"; \
+  python -m pip install --no-cache-dir --no-deps --no-build-isolation .
+
+#RUN python -m pip install pyminichem==${PYMINICHEM_VER} --no-deps
 
 ############################
 # Final setup

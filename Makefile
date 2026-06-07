@@ -64,7 +64,7 @@ start: env ## Open a bash shell inside the 'dev' container as the host user, exi
 		bash -c 'git config --global --add safe.directory /canoe; exec bash'
 
 build: env ## Build (or rebuild) the 'dev' container and start it
-	@docker compose up -d --build dev
+	@DOCKER_BUILDKIT=1 docker compose up -d --build dev
 
 deploy: env ## Deploy a multi-node job to cluster
 	@docker tag canoe:latest ${HOST}:5000/canoe:tmp

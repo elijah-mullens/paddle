@@ -6,6 +6,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      ssh:
+        - default
       args:
         UBUNTU_VER: "22.04"
         CUDA_VER: "12.9.1"
@@ -15,7 +17,7 @@ services:
         PYHARP_VER: "v2.4.6"
         KINTERA_VER: "v2.3.6"
         SNAPY_VER: "v2.6.2"
-        PYMINICHEM_VER: "v0.3.3"
+        PYMINICHEM_VER: "v0.3.4"
     environment:
       - USERNAME=${USER}
       - USER_UID=${USER_UID}
