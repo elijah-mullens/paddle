@@ -3,14 +3,39 @@ from __future__ import annotations
 import argparse
 from typing import Sequence
 
-from .cubed_sphere_remap import main as cubed_sphere_remap_main
-from .monitor import main as monitor_main
-from .submit import main as submit_main
+
+def cubed_sphere_collapse_main(argv: Sequence[str] | None = None) -> int:
+    from .cubed_sphere_collapse import main
+
+    return main(argv)
+
+
+def cubed_sphere_remap_main(argv: Sequence[str] | None = None) -> int:
+    from .cubed_sphere_remap import main
+
+    return main(argv)
+
+
+def monitor_main(argv: Sequence[str] | None = None) -> int:
+    from .monitor import main
+
+    return main(argv)
+
+
+def submit_main(argv: Sequence[str] | None = None) -> int:
+    from .submit import main
+
+    return main(argv)
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="paddle")
     subparsers = parser.add_subparsers(dest="command")
+    subparsers.add_parser(
+        "cs-collapse",
+        add_help=False,
+        help="Collapse a 24-block cubed-sphere restart into six face blocks.",
+    )
     subparsers.add_parser(
         "cs-remap",
         help="Remap stitched cubed-sphere NetCDF outputs to a lat-lon grid.",
@@ -31,6 +56,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args, remaining = parser.parse_known_args(argv)
+    if args.command == "cs-collapse":
+        return cubed_sphere_collapse_main(remaining)
     if args.command == "cs-remap":
         return cubed_sphere_remap_main(remaining)
     if args.command == "monitor":
