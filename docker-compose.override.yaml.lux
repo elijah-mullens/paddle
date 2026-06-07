@@ -4,5 +4,7 @@ services:
     build:
       dockerfile: docker/Dockerfile.cuda
       args:
+        TORCH_VER: "2.7.1"
         CUDA_VER: "11.8.0"
+        NVHPC_VER: "23.9"
     gpus: all

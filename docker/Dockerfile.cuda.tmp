@@ -5,14 +5,19 @@ ARG UBUNTU_VER=22.04
 ############################
 # Base CUDA toolchain
 ############################
-FROM nvidia/cuda:${CUDA_VER}-devel-ubuntu${UBUNTU_VER} AS base
+#FROM nvidia/cuda:${CUDA_VER}-devel-ubuntu${UBUNTU_VER} AS base
+FROM nvcr.io/nvidia/nvhpc:22.11-devel-cuda11.8-ubuntu${UBUNTU_VER} AS base
+
+ARG NVHPC_PACKAGE=nvhpc-25-3
+ARG NVHPC_INSTALL_VERSION=25.3
 
 ARG TORCH_VER=2.10.0
-ARG PYDISORT_VER=v1.7.3
-ARG PYHARP_VER=v2.4.2
-ARG KINTERA_VER=v2.3.6
-ARG SNAPY_VER=v2.6.2
-ARG PYMINICHEM_VER=v0.3.2
+ARG PYDISORT_VER=v1.6.1
+ARG PYHARP_VER=v1.10.2
+ARG KINTERA_VER=v1.4.0
+ARG SNAPY_VER=v1.4.1
+ARG PYMINICHEM_VER=v0.3.0
+ARG PADDLE_VER=v1.3.0
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC
@@ -24,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       gcc g++ gfortran \
       ninja-build \
       cmake \
+      openssh-client \
       git curl ca-certificates \
       python3 python3-pip python3-venv python3-dev \
       pkg-config \
@@ -146,6 +152,41 @@ ENV TORCH_CUDA_ARCH_LIST="8.6;8.9;9.0+PTX"  \
     CUDA_CACHE_MAXSIZE=2147483647
 
 ############################
+# Install pyminichem
+############################
+WORKDIR /workspace
+
+#RUN curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
+#RUN echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' | tee /etc/apt/sources.list.d/nvhpc.list
+#RUN apt-get update && apt-get install -y ${NVHPC_PACKAGE}
+
+#ENV NVHPC=/opt/nvidia/hpc_sdk
+#ENV NVHPC_CUDA_HOME=${NVHPC}/Linux_x86_64/${NVHPC_INSTALL_VERSION}/cuda/11.8
+#ENV CUDA_HOME=${NVHPC_CUDA_HOME}
+#ENV CUDA_PATH=${NVHPC_CUDA_HOME}
+#ENV PATH=${CUDA_HOME}/bin:${NVHPC}/Linux_x86_64/${NVHPC_INSTALL_VERSION}/compilers/bin:${PATH}
+#ENV LD_LIBRARY_PATH=${NVHPC}/Linux_x86_64/${NVHPC_INSTALL_VERSION}/compilers/lib:${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+
+# Trust GitHub host key
+RUN mkdir -p -m 0700 ~/.ssh && \
+    ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+RUN --mount=type=ssh \
+    set -eu pipefail; \
+    if [ ! -d "pyminichem/.git" ]; then \
+      rm -rf pyminichem; \
+      git clone --filter=blob:none --depth 1 --no-single-branch git@github.com:chengcli/pyminichem.git pyminichem; \
+    fi; \
+    cd pyminichem; \
+    git fetch --force --tags --prune --depth 1; \
+    git checkout -f "${PYMINICHEM_VER}"; \
+    echo $PATH; \
+    echo $LD_LIBRARY_PATH; \
+    cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
+    cmake --build build --parallel "$(nproc)"; \
+    python -m pip install --no-cache-dir --no-deps --no-build-isolation .
+
+############################
 # Install pydisort
 ############################
 WORKDIR /workspace
@@ -221,47 +262,24 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     cmake --build build --parallel "$(nproc)"; \
     python -m pip install --no-cache-dir --no-deps --no-build-isolation .
 
+
+
 ############################
 # Install paddle
 ############################
 WORKDIR /workspace
 
-RUN python -m pip install paddle --no-deps
-
-############################
-# Install pyminichem
-############################
-WORKDIR /workspace
-
-RUN python -m pip install pyminichem==${PYMINICHEM_VER} --no-deps
-
-############################
-# Install nvfortran library
-############################
-ARG NVHPC_VER=23.9
-ARG NVHPC_TAG="${NVHPC_VER/./-}"
-
-RUN curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK \
-  | gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
-
-RUN echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' \
-  | tee /etc/apt/sources.list.d/nvhpc.list
-
-RUN apt update && apt install -y nvhpc-${NVHPC_TAG}
-
-RUN rm -rf \
-    /usr/share/doc \
-    /usr/share/man \
-    /usr/share/info \
-    /usr/share/licenses \
-    /opt/nvidia/hpc_sdk/Linux_x86_64/${NVHPC_VERSION}/examples \
-    /opt/nvidia/hpc_sdk/Linux_x86_64/${NVHPC_VERSION}/documentation
-
-ENV NVHPC_HOME=/opt/nvidia/hpc_sdk/Linux_x86_64/${NVHPC_VERSION}/compilers
-ENV CUDA_HOME=/usr/local/cuda-"${CUDA_VER%.*}"
-ENV CUDA_PATH=${CUDA_HOME}
-ENV PATH=${CUDA_HOME}/bin:${NVHPC_HOME}/bin:${PATH}
-ENV LD_LIBRARY_PATH=${NVHPC_HOME}/lib:${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/root/.cache/ccache \
+    set -eu pipefail; \
+    if [ ! -d "paddle/.git" ]; then \
+      rm -rf paddle; \
+      git clone --filter=blob:none --depth 1 --no-single-branch https://github.com/elijah-mullens/paddle/ paddle; \
+    fi; \
+    cd paddle; \
+    git fetch --force --tags --prune --depth 1; \
+    git checkout -f "${PADDLE_VER}"; \
+    python -m pip install --no-cache-dir --no-deps .
 
 ############################
 # Final setup
