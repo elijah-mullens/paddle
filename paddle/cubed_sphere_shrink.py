@@ -4,6 +4,7 @@ import argparse
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 import hashlib
+import math
 import os
 from pathlib import Path
 import re
@@ -15,9 +16,7 @@ import torch
 
 
 RESTART_BUNDLE_MAGIC = "SNAPY_RESTART_BUNDLE_V1"
-SOURCE_BLOCK_COUNT = 24
-TARGET_BLOCK_COUNT = 6
-BLOCKS_PER_FACE = 4
+FACE_COUNT = 6
 _BLOCK_RANK_RE = re.compile(r"\.block(\d+)\.")
 
 
@@ -77,7 +76,9 @@ def read_restart_bundle_index(path: str | os.PathLike[str]) -> list[RestartBundl
     return indexed_entries
 
 
-def _entries_by_rank(entries: Sequence[RestartBundleEntry]) -> dict[int, RestartBundleEntry]:
+def _entries_by_rank(
+    entries: Sequence[RestartBundleEntry], expected_count: int
+) -> dict[int, RestartBundleEntry]:
     result: dict[int, RestartBundleEntry] = {}
     for entry in entries:
         match = _BLOCK_RANK_RE.search(entry.name)
@@ -88,13 +89,49 @@ def _entries_by_rank(entries: Sequence[RestartBundleEntry]) -> dict[int, Restart
             raise ValueError(f"restart bundle contains duplicate block rank {rank}")
         result[rank] = entry
 
-    expected = set(range(SOURCE_BLOCK_COUNT))
+    expected = set(range(expected_count))
     if set(result) != expected:
         raise ValueError(
-            "expected source block ranks 0 through 23, got "
+            f"expected source block ranks 0 through {expected_count - 1}, got "
             f"{sorted(result)}"
         )
     return result
+
+
+def _infer_subdivision(block_count: int) -> int:
+    if block_count % FACE_COUNT:
+        raise ValueError(
+            f"cubed-sphere restart block count must equal 6*N^2, got {block_count}"
+        )
+    n = math.isqrt(block_count // FACE_COUNT)
+    if n <= 0 or FACE_COUNT * n * n != block_count:
+        raise ValueError(
+            f"cubed-sphere restart block count must equal 6*N^2, got {block_count}"
+        )
+    return n
+
+
+def _compact1by1(value: int) -> int:
+    value &= 0x55555555
+    value = (value | (value >> 1)) & 0x33333333
+    value = (value | (value >> 2)) & 0x0F0F0F0F
+    value = (value | (value >> 4)) & 0x00FF00FF
+    value = (value | (value >> 8)) & 0x0000FFFF
+    return value
+
+
+def _zorder_coords(n: int) -> list[tuple[int, int]]:
+    if n <= 0:
+        raise ValueError("N must be positive")
+    coords: list[tuple[int, int]] = []
+    code = 0
+    while len(coords) < n * n:
+        x = _compact1by1(code)
+        y = _compact1by1(code >> 1)
+        if x < n and y < n:
+            coords.append((x, y))
+        code += 1
+    return coords
 
 
 def _load_entry(
@@ -144,7 +181,9 @@ def _validate_schema(blocks: Sequence[dict[str, torch.Tensor]]) -> list[str]:
     return names
 
 
-def _collapse_spatial_tensor(tiles: Sequence[torch.Tensor], nghost: int) -> torch.Tensor:
+def _shrink_spatial_tensor(
+    tiles: Sequence[torch.Tensor], n: int, nghost: int
+) -> torch.Tensor:
     tile_x3 = tiles[0].shape[-3]
     tile_x2 = tiles[0].shape[-2]
     if tile_x3 <= 2 * nghost or tile_x2 <= 2 * nghost:
@@ -153,34 +192,37 @@ def _collapse_spatial_tensor(tiles: Sequence[torch.Tensor], nghost: int) -> torc
             f"nghost={nghost}"
         )
 
-    bottom = torch.cat(
-        (
-            tiles[0][..., :-nghost, :-nghost, :],
-            tiles[1][..., :-nghost, nghost:, :],
-        ),
-        dim=-2,
-    )
-    top = torch.cat(
-        (
-            tiles[2][..., nghost:, :-nghost, :],
-            tiles[3][..., nghost:, nghost:, :],
-        ),
-        dim=-2,
-    )
-    return torch.cat((bottom, top), dim=-3).contiguous()
+    tiles_by_coord = dict(zip(_zorder_coords(n), tiles))
+    rows = []
+    for y in range(n):
+        row = []
+        for x in range(n):
+            x3_start = 0 if y == 0 else nghost
+            x3_stop = None if y == n - 1 else -nghost
+            x2_start = 0 if x == 0 else nghost
+            x2_stop = None if x == n - 1 else -nghost
+            row.append(
+                tiles_by_coord[x, y][
+                    ..., x3_start:x3_stop, x2_start:x2_stop, :
+                ]
+            )
+        rows.append(torch.cat(row, dim=-2))
+    return torch.cat(rows, dim=-3).contiguous()
 
 
-def _collapse_face(
+def _shrink_face(
     bundle_path: str,
     entries: Sequence[RestartBundleEntry],
     face: int,
+    n: int,
     nghost: int,
     part_path: str,
 ) -> tuple[int, dict[str, str], dict[str, tuple[tuple[int, ...], str]]]:
     torch.set_num_threads(1)
+    blocks_per_face = n * n
     blocks = [
-        _load_entry(bundle_path, entries[face * BLOCKS_PER_FACE + i])
-        for i in range(BLOCKS_PER_FACE)
+        _load_entry(bundle_path, entries[face * blocks_per_face + i])
+        for i in range(blocks_per_face)
     ]
     names = _validate_schema(blocks)
 
@@ -190,7 +232,7 @@ def _collapse_face(
     for name in names:
         source_tensors = [block[name] for block in blocks]
         if source_tensors[0].ndim >= 3:
-            output[name] = _collapse_spatial_tensor(source_tensors, nghost)
+            output[name] = _shrink_spatial_tensor(source_tensors, n, nghost)
         else:
             if not all(
                 torch.equal(source_tensors[0], tensor)
@@ -244,12 +286,11 @@ def _write_bundle(path: Path, part_paths: Sequence[Path]) -> None:
                 shutil.copyfileobj(source, output, length=8 * 1024 * 1024)
 
 
-def collapse_cubed_sphere_restart(
+def _validate_paths(
     input_path: str | os.PathLike[str],
     output_path: str | os.PathLike[str],
-    *,
-    nghost: int = 3,
-) -> Path:
+    nghost: int,
+) -> tuple[Path, Path]:
     source = Path(input_path).expanduser().resolve()
     output = Path(output_path).expanduser().resolve()
     if source == output:
@@ -262,28 +303,47 @@ def collapse_cubed_sphere_restart(
         raise FileNotFoundError(f"output directory does not exist: {output.parent}")
     if nghost <= 0:
         raise ValueError("nghost must be positive")
+    return source, output
 
-    entries_by_rank = _entries_by_rank(read_restart_bundle_index(source))
-    ordered_entries = [entries_by_rank[rank] for rank in range(SOURCE_BLOCK_COUNT)]
+
+def _publish_bundle(temporary_bundle: Path, output: Path) -> None:
+    try:
+        os.link(temporary_bundle, output)
+    except FileExistsError:
+        raise FileExistsError(f"output restart already exists: {output}") from None
+
+
+def shrink_cubed_sphere_restart(
+    input_path: str | os.PathLike[str],
+    output_path: str | os.PathLike[str],
+    *,
+    nghost: int = 3,
+) -> Path:
+    source, output = _validate_paths(input_path, output_path, nghost)
+    entries = read_restart_bundle_index(source)
+    n = _infer_subdivision(len(entries))
+    entries_by_rank = _entries_by_rank(entries, len(entries))
+    ordered_entries = [entries_by_rank[rank] for rank in range(len(entries))]
 
     with tempfile.TemporaryDirectory(
-        prefix=f".{output.name}.collapse-", dir=output.parent
+        prefix=f".{output.name}.shrink-", dir=output.parent
     ) as temporary_directory:
         temporary = Path(temporary_directory)
         part_paths = [
-            temporary / f"block{face}.part" for face in range(TARGET_BLOCK_COUNT)
+            temporary / f"block{face}.part" for face in range(FACE_COUNT)
         ]
-        with ProcessPoolExecutor(max_workers=TARGET_BLOCK_COUNT) as executor:
+        with ProcessPoolExecutor(max_workers=FACE_COUNT) as executor:
             futures = [
                 executor.submit(
-                    _collapse_face,
+                    _shrink_face,
                     str(source),
                     ordered_entries,
                     face,
+                    n,
                     nghost,
                     str(part_paths[face]),
                 )
-                for face in range(TARGET_BLOCK_COUNT)
+                for face in range(FACE_COUNT)
             ]
             results = sorted(
                 (future.result() for future in futures), key=lambda item: item[0]
@@ -292,23 +352,20 @@ def collapse_cubed_sphere_restart(
         _validate_worker_results(results)
         temporary_bundle = temporary / output.name
         _write_bundle(temporary_bundle, part_paths)
-        try:
-            os.link(temporary_bundle, output)
-        except FileExistsError:
-            raise FileExistsError(f"output restart already exists: {output}") from None
+        _publish_bundle(temporary_bundle, output)
 
     return output
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="paddle cs-collapse",
+        prog="paddle cs-shrink",
         description=(
-            "Collapse a Snapy nb2=nb3=2 cubed-sphere restart into six "
-            "nb2=nb3=1 face blocks using six worker processes."
+            "Shrink a Snapy 6*N^2-block cubed-sphere restart into six "
+            "face blocks using six worker processes."
         ),
     )
-    parser.add_argument("input", help="Input 24-block Snapy restart bundle")
+    parser.add_argument("input", help="Input 6*N^2-block Snapy restart bundle")
     parser.add_argument("output", help="New six-block Snapy restart bundle")
     parser.add_argument(
         "--nghost",
@@ -321,7 +378,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    collapse_cubed_sphere_restart(args.input, args.output, nghost=args.nghost)
+    shrink_cubed_sphere_restart(args.input, args.output, nghost=args.nghost)
     return 0
 
 

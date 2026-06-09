@@ -50,7 +50,8 @@ Issues = "https://github.com/elijah-mullens/paddle/issues"
 
 [project.scripts]
 paddle = "paddle.__main__:main"
-paddle-cs-collapse = "paddle.cubed_sphere_collapse:main"
+paddle-cs-shrink = "paddle.cubed_sphere_shrink:main"
+paddle-cs-expand = "paddle.cubed_sphere_expand:main"
 paddle-cs-remap = "paddle.cubed_sphere_remap:main"
 
 [tool.pytest.ini_options]
