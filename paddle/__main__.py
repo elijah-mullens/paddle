@@ -4,8 +4,14 @@ import argparse
 from typing import Sequence
 
 
-def cubed_sphere_collapse_main(argv: Sequence[str] | None = None) -> int:
-    from .cubed_sphere_collapse import main
+def cubed_sphere_shrink_main(argv: Sequence[str] | None = None) -> int:
+    from .cubed_sphere_shrink import main
+
+    return main(argv)
+
+
+def cubed_sphere_expand_main(argv: Sequence[str] | None = None) -> int:
+    from .cubed_sphere_expand import main
 
     return main(argv)
 
@@ -32,9 +38,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="paddle")
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser(
-        "cs-collapse",
+        "cs-shrink",
         add_help=False,
-        help="Collapse a 24-block cubed-sphere restart into six face blocks.",
+        help="Shrink a 6*N^2-block cubed-sphere restart into six face blocks.",
+    )
+    subparsers.add_parser(
+        "cs-expand",
+        add_help=False,
+        help="Expand six cubed-sphere face blocks into 6*N^2 blocks.",
     )
     subparsers.add_parser(
         "cs-remap",
@@ -56,8 +67,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args, remaining = parser.parse_known_args(argv)
-    if args.command == "cs-collapse":
-        return cubed_sphere_collapse_main(remaining)
+    if args.command == "cs-shrink":
+        return cubed_sphere_shrink_main(remaining)
+    if args.command == "cs-expand":
+        return cubed_sphere_expand_main(remaining)
     if args.command == "cs-remap":
         return cubed_sphere_remap_main(remaining)
     if args.command == "monitor":
