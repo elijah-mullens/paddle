@@ -32,7 +32,7 @@ classifiers = [
 
 dependencies = [
   "torch>=2.7.0",
-  "snapy>=1.3.5",
+  "snapy>=2.6.5",
   "scipy",
   "netCDF4",
   "rich>=13"
@@ -53,6 +53,8 @@ paddle = "paddle.__main__:main"
 paddle-cs-shrink = "paddle.cubed_sphere_shrink:main"
 paddle-cs-expand = "paddle.cubed_sphere_expand:main"
 paddle-cs-remap = "paddle.cubed_sphere_remap:main"
+paddle-refine = "paddle.restart_resize:refine_main"
+paddle-coarsen = "paddle.restart_resize:coarsen_main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

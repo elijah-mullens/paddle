@@ -22,6 +22,18 @@ def cubed_sphere_remap_main(argv: Sequence[str] | None = None) -> int:
     return main(argv)
 
 
+def refine_main(argv: Sequence[str] | None = None) -> int:
+    from .restart_resize import refine_main
+
+    return refine_main(argv)
+
+
+def coarsen_main(argv: Sequence[str] | None = None) -> int:
+    from .restart_resize import coarsen_main
+
+    return coarsen_main(argv)
+
+
 def monitor_main(argv: Sequence[str] | None = None) -> int:
     from .monitor import main
 
@@ -52,6 +64,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Remap stitched cubed-sphere NetCDF outputs to a lat-lon grid.",
     )
     subparsers.add_parser(
+        "refine",
+        add_help=False,
+        help="Double a restart's horizontal resolution.",
+    )
+    subparsers.add_parser(
+        "coarsen",
+        add_help=False,
+        help="Halve a restart's horizontal resolution.",
+    )
+    subparsers.add_parser(
         "monitor",
         add_help=False,
         help="Monitor CPU, GPU, and disk usage on machines over SSH.",
@@ -73,6 +95,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return cubed_sphere_expand_main(remaining)
     if args.command == "cs-remap":
         return cubed_sphere_remap_main(remaining)
+    if args.command == "refine":
+        return refine_main(remaining)
+    if args.command == "coarsen":
+        return coarsen_main(remaining)
     if args.command == "monitor":
         return monitor_main(remaining)
     if args.command == "submit":
