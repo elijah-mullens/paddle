@@ -7,6 +7,7 @@ import socket
 import subprocess
 import sys
 
+import kintera
 import pytest
 
 
@@ -33,6 +34,7 @@ def _get_free_port() -> int:
 def test_run_hydro_jupiter_cpu_examples(tmp_path: Path, yaml_name: str) -> None:
     input_path = tmp_path / yaml_name
     shutil.copy2(EXAMPLE_DIR / yaml_name, input_path)
+    shutil.copy2(Path(kintera.__file__).parent / "data" / "nasa9.dat", tmp_path)
 
     env = os.environ.copy()
     python_path = str(REPO_ROOT)

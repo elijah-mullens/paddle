@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import shutil
 import socket
 import subprocess
 import sys
 
+import kintera
 import pytest
 import yaml
 
@@ -32,6 +34,7 @@ def _base_env() -> dict[str, str]:
 
 
 def _write_yaml(tmp_path: Path, source_name: str, updates: dict) -> Path:
+    shutil.copy2(Path(kintera.__file__).parent / "data" / "nasa9.dat", tmp_path)
     with open(EXAMPLE_DIR / source_name, "r", encoding="utf-8") as stream:
         config = yaml.safe_load(stream)
     for key, value in updates.items():
