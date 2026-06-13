@@ -7,7 +7,6 @@ import socket
 import subprocess
 import sys
 
-import kintera
 import pytest
 
 
