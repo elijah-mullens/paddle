@@ -29,6 +29,7 @@ _CS_L2G_VEL = (
 
 _COORDINATE_VARS = {"time", "x1", "x1f", "x2", "x2f", "x3", "x3f", "lon", "lat"}
 _DEFAULT_VECTOR_TRIPLETS = (("vel1", "vel2", "vel3"),)
+_REMAP_METHODS = ("bilinear", "conservative")
 
 
 @dataclass(frozen=True)
@@ -246,7 +247,9 @@ def _generate_tempest_map(
     nlon: int,
     map_path: Path,
     tempest_paths: TempestPaths,
+    remap_method: str = "bilinear",
 ) -> Path:
+    _validate_remap_method(remap_method)
     map_path.parent.mkdir(parents=True, exist_ok=True)
     if map_path.exists():
         return map_path
@@ -292,26 +295,45 @@ def _generate_tempest_map(
             ]
         )
 
-    _run_command(
-        [
-            tempest_paths.generate_offline_map,
-            "--in_mesh",
-            str(source_mesh),
-            "--out_mesh",
-            str(target_mesh),
-            "--ov_mesh",
-            str(overlap_mesh),
-            "--in_type",
-            "fv",
-            "--out_type",
-            "fv",
-            "--in_np",
-            "1",
-            "--out_map",
-            str(map_path),
-        ]
-    )
+    map_command = [
+        tempest_paths.generate_offline_map,
+        "--in_mesh",
+        str(source_mesh),
+        "--out_mesh",
+        str(target_mesh),
+        "--ov_mesh",
+        str(overlap_mesh),
+        "--in_type",
+        "fv",
+        "--out_type",
+        "fv",
+        "--in_np",
+        "1",
+    ]
+    if remap_method == "bilinear":
+        map_command.extend(["--method", "bilin"])
+    map_command.extend(["--out_map", str(map_path)])
+    _run_command(map_command)
     return map_path
+
+
+def _validate_remap_method(remap_method: str) -> None:
+    if remap_method not in _REMAP_METHODS:
+        methods = ", ".join(_REMAP_METHODS)
+        raise ValueError(
+            f"Unknown remap method '{remap_method}'; expected one of {methods}"
+        )
+
+
+def _map_cache_path(
+    cache_dir: Path,
+    layout: MosaicLayout,
+    nlat: int,
+    nlon: int,
+    remap_method: str,
+) -> Path:
+    _validate_remap_method(remap_method)
+    return cache_dir / f"cs_res{layout.face_nx}_to_rll_{nlat}x{nlon}_{remap_method}.nc"
 
 
 def _load_offline_map_matrix(map_path: str | os.PathLike[str]) -> sparse.csr_matrix:
@@ -659,9 +681,11 @@ def remap_cubed_sphere_files(
     vector_triplets: Sequence[Sequence[str]] | None = None,
     map_cache_dir: str | os.PathLike[str] | None = None,
     tempest_bin_dir: str | os.PathLike[str] | None = None,
+    remap_method: str = "bilinear",
 ) -> Path:
     if not inputs:
         raise ValueError("At least one input file is required")
+    _validate_remap_method(remap_method)
 
     datasets, var_sources = _load_inputs(inputs)
     try:
@@ -699,10 +723,17 @@ def remap_cubed_sphere_files(
             if map_cache_dir is not None
             else Path(output).resolve().parent / ".tempestremap"
         )
-        map_path = cache_dir / f"cs_res{layout.face_nx}_to_rll_{nlat}x{nlon}.nc"
+        map_path = _map_cache_path(cache_dir, layout, nlat, nlon, remap_method)
         if not map_path.exists():
             tempest_paths = ensure_tempestremap_available(tempest_bin_dir)
-            _generate_tempest_map(layout.face_nx, nlat, nlon, map_path, tempest_paths)
+            _generate_tempest_map(
+                layout.face_nx,
+                nlat,
+                nlon,
+                map_path,
+                tempest_paths,
+                remap_method=remap_method,
+            )
         weights = _load_offline_map_matrix(map_path)
 
         scalar_source_arrays = {}
@@ -767,6 +798,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Vector triplet in the form vel1,vel2,vel3",
     )
     parser.add_argument(
+        "--method",
+        choices=_REMAP_METHODS,
+        default="bilinear",
+        help=(
+            "Remapping method. Bilinear treats Snapy fields as cell-centered "
+            "samples; conservative treats them as finite-volume cell averages."
+        ),
+    )
+    parser.add_argument(
         "--map-cache-dir",
         default=None,
         help="Directory to cache TempestRemap mesh and map files.",
@@ -794,5 +834,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         vector_triplets=vector_triplets,
         map_cache_dir=args.map_cache_dir,
         tempest_bin_dir=args.tempest_bin_dir,
+        remap_method=args.method,
     )
     return 0

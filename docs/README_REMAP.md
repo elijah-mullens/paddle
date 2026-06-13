@@ -85,6 +85,31 @@ and remapped science fields on dimensions:
 The output follows CF conventions for the coordinate axes and includes
 `altitude_bounds` when the input file provides `x1f`.
 
+`--nlat` and `--nlon` specify the number of output cells. For example,
+`--nlat 181 --nlon 360` writes cell-center coordinates near `-89.5` through
+`89.5` degrees latitude and `0.5` through `359.5` degrees longitude. The
+coordinates do not include points exactly at the poles.
+
+## Remapping Method
+
+By default, `paddle` uses TempestRemap bilinear interpolation because Snapy
+NetCDF fields are cell-centered samples. This produces smoother geographic
+fields across cubed-sphere face boundaries:
+
+```bash
+paddle-cs-remap in.nc out.nc --nlat 181 --nlon 360 --method bilinear
+```
+
+For workflows that require conservation of finite-volume cell averages, use:
+
+```bash
+paddle-cs-remap in.nc out.nc --nlat 181 --nlon 360 --method conservative
+```
+
+Conservative remapping treats every Snapy value as a finite-volume cell
+average. This preserves integrals but can retain visible cubed-sphere patterns
+when the source values are intended as point samples.
+
 ## 0.5 Degree Example
 
 For a 0.5 degree grid, use 360 latitude cells and 720 longitude cells:
@@ -136,8 +161,9 @@ For other triplet names, the remapper uses `<base>_east`, `<base>_north`, and
 
 ## Caching TempestRemap Weights
 
-The first run at a new source-target resolution generates a TempestRemap mesh,
-overlap mesh, and offline map. Reuse those files with `--map-cache-dir`:
+The first run at a new source-target resolution and remapping method generates
+a TempestRemap mesh, overlap mesh, and offline map. Reuse those files with
+`--map-cache-dir`:
 
 ```bash
 paddle-cs-remap \
@@ -148,7 +174,8 @@ paddle-cs-remap \
 ```
 
 This avoids rebuilding the map on later runs with the same cubed-sphere
-resolution and target grid.
+resolution, target grid, and remapping method. Bilinear and conservative maps
+use separate cache files.
 
 ## TempestRemap In A Non-Standard Location
 
@@ -206,5 +233,7 @@ and data variables on:
 - The input is a stitched cubed-sphere mosaic, not a lat-lon grid.
 - Snapy and TempestRemap do not use the same face ordering internally.
 - `paddle` reorders the six faces before applying the TempestRemap map.
+- Snapy `vel1,vel2,vel3` are contravariant components. `paddle` converts them
+  using Snapy's cubed-sphere geometry before remapping geographic components.
 - Latitude in the output file is written south-to-north, which matches the
   TempestRemap target mesh ordering used by the current implementation.

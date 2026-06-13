@@ -40,9 +40,11 @@ case "${mode}" in
     trap 'rm -rf "${workdir}"' EXIT
     git clone https://github.com/ClimateGlobalChange/tempestremap.git "${workdir}/tempestremap"
     cd "${workdir}/tempestremap"
-    if [[ -x ./autogen.sh ]]; then
-      ./autogen.sh
-    fi
+if ! command -v autoreconf >/dev/null 2>&1; then
+  echo "Missing 'autoreconf' (autoconf). Install autoconf/automake/libtool or use the 'conda' mode." >&2
+  exit 1
+fi
+autoreconf -fi
     ./configure --prefix="${prefix}"
     make -j"$(nproc)"
     make install
