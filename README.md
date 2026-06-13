@@ -147,7 +147,9 @@ paddle-cs-remap \
 The remapper treats Snapy outputs as the 2D stitched 3x2 cubed-sphere mosaic
 written by Snapy's NetCDF output code. Scalar fields are remapped directly.
 `vel1, vel2, vel3` are rotated to geographic `vel_east, vel_north, vel_up`
-before remapping.
+before remapping. Bilinear interpolation is the default for Snapy's
+cell-centered samples; pass `--method conservative` when integral preservation
+is required.
 
 ### Install TempestRemap
 

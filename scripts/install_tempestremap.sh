@@ -40,9 +40,7 @@ case "${mode}" in
     trap 'rm -rf "${workdir}"' EXIT
     git clone https://github.com/ClimateGlobalChange/tempestremap.git "${workdir}/tempestremap"
     cd "${workdir}/tempestremap"
-    if [[ -x ./autogen.sh ]]; then
-      ./autogen.sh
-    fi
+    autoreconf -fi
     ./configure --prefix="${prefix}"
     make -j"$(nproc)"
     make install

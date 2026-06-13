@@ -61,6 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers.add_parser(
         "cs-remap",
+        add_help=False,
         help="Remap stitched cubed-sphere NetCDF outputs to a lat-lon grid.",
     )
     subparsers.add_parser(
