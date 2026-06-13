@@ -333,10 +333,7 @@ def _map_cache_path(
     remap_method: str,
 ) -> Path:
     _validate_remap_method(remap_method)
-    return (
-        cache_dir
-        / f"cs_res{layout.face_nx}_to_rll_{nlat}x{nlon}_{remap_method}.nc"
-    )
+    return cache_dir / f"cs_res{layout.face_nx}_to_rll_{nlat}x{nlon}_{remap_method}.nc"
 
 
 def _load_offline_map_matrix(map_path: str | os.PathLike[str]) -> sparse.csr_matrix:

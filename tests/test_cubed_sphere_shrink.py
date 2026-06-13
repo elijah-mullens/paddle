@@ -67,9 +67,7 @@ def _expected_face(face: int, n: int) -> torch.Tensor:
 
 
 @pytest.mark.parametrize("n", [1, 2, 3])
-def test_shrink_cubed_sphere_restart_stitches_six_faces(
-    tmp_path: Path, n: int
-) -> None:
+def test_shrink_cubed_sphere_restart_stitches_six_faces(tmp_path: Path, n: int) -> None:
     source = tmp_path / "source.restart"
     output = tmp_path / "shrunk.restart"
     _make_source_bundle(source, n=n)
@@ -138,8 +136,7 @@ def test_zorder_coords_match_snapy_filtered_morton_order() -> None:
 
 def test_shrink_spatial_tensor_removes_internal_ghosts_in_logical_order() -> None:
     tiles = [
-        torch.full((1, 4, 4, 1), float(rank), dtype=torch.float64)
-        for rank in range(9)
+        torch.full((1, 4, 4, 1), float(rank), dtype=torch.float64) for rank in range(9)
     ]
 
     result = _shrink_spatial_tensor(tiles, n=3, nghost=1)

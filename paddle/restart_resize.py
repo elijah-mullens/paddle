@@ -67,6 +67,9 @@ def resize_spatial_tensor(
         output_interior = (interior_x3 // 2, interior_x2 // 2)
         interpolation_mode = "area"
 
+    if nghost == 0:
+        return _resize_plane(tensor, output_interior, interpolation_mode)
+
     output_size = (
         output_interior[0] + 2 * nghost,
         output_interior[1] + 2 * nghost,
@@ -190,7 +193,9 @@ def resize_restart(
                 tensor = block[name]
                 current_schema = (tuple(tensor.shape), tensor.dtype)
                 if name in schema and schema[name] != current_schema:
-                    raise ValueError(f"source blocks have inconsistent schema for {name}")
+                    raise ValueError(
+                        f"source blocks have inconsistent schema for {name}"
+                    )
                 schema[name] = current_schema
 
                 if tensor.ndim >= 3:
@@ -273,7 +278,6 @@ def resize_restart(
 
 def build_parser(mode: ResizeMode) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog=f"paddle {mode}",
         description=f"{mode.capitalize()} a Snapy restart horizontally by a factor of two.",
     )
     parser.add_argument("config", help="Snapy YAML configuration for the restart")

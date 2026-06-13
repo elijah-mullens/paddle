@@ -104,9 +104,7 @@ def expand_cubed_sphere_restart(
         prefix=f".{output.name}.expand-", dir=output.parent
     ) as temporary_directory:
         temporary = Path(temporary_directory)
-        part_paths = [
-            temporary / f"block{rank}.part" for rank in range(block_count)
-        ]
+        part_paths = [temporary / f"block{rank}.part" for rank in range(block_count)]
         with ProcessPoolExecutor(max_workers=FACE_COUNT) as executor:
             futures = [
                 executor.submit(

@@ -65,8 +65,7 @@ def _global_cartesian_to_snapy_contravariant(
 
     for face in range(6):
         local_z, local_x, local_y = (
-            sign * global_zyx[global_idx]
-            for global_idx, sign in _CS_L2G_VEL[face]
+            sign * global_zyx[global_idx] for global_idx, sign in _CS_L2G_VEL[face]
         )
         vel1[face] = (local_z + x * local_x + y * local_y) / delta
         vel2[face] = d_val / delta * (local_x - x * local_z)
@@ -132,9 +131,7 @@ def test_rotate_vector_faces_to_geographic_recovers_global_cartesian_vector() ->
         beta,
     )
 
-    east, north, up = rotate_vector_faces_to_geographic(
-        vel1, vel2, vel3, lon, lat
-    )
+    east, north, up = rotate_vector_faces_to_geographic(vel1, vel2, vel3, lon, lat)
 
     expected_east = -np.sin(lon) * global_x + np.cos(lon) * global_y
     expected_north = (
@@ -165,11 +162,7 @@ def test_reorder_faces_to_tempest_preserves_geographic_scalar_alignment() -> Non
     reordered_xyz = reorder_faces_to_tempest(np.moveaxis(xyz, -1, 0))
     reordered_scalar = reorder_faces_to_tempest(scalar)
 
-    expected = (
-        reordered_xyz[0]
-        + 2.0 * reordered_xyz[1]
-        - 0.5 * reordered_xyz[2]
-    )
+    expected = reordered_xyz[0] + 2.0 * reordered_xyz[1] - 0.5 * reordered_xyz[2]
     np.testing.assert_allclose(reordered_scalar, expected)
 
 
@@ -269,9 +262,7 @@ def test_run_command_executes_subprocess_once(monkeypatch) -> None:
 
 def test_parser_defaults_to_bilinear_and_accepts_conservative() -> None:
     parser = build_parser()
-    default = parser.parse_args(
-        ["in.nc", "out.nc", "--nlat", "181", "--nlon", "360"]
-    )
+    default = parser.parse_args(["in.nc", "out.nc", "--nlat", "181", "--nlon", "360"])
     conservative = parser.parse_args(
         [
             "in.nc",

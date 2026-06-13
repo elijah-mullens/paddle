@@ -72,7 +72,9 @@ def read_restart_bundle_index(path: str | os.PathLike[str]) -> list[RestartBundl
         running_offset += entry.size
 
     if path.stat().st_size != running_offset:
-        raise ValueError(f"{path}: restart bundle payload size does not match its index")
+        raise ValueError(
+            f"{path}: restart bundle payload size does not match its index"
+        )
     return indexed_entries
 
 
@@ -201,11 +203,7 @@ def _shrink_spatial_tensor(
             x3_stop = None if y == n - 1 else -nghost
             x2_start = 0 if x == 0 else nghost
             x2_stop = None if x == n - 1 else -nghost
-            row.append(
-                tiles_by_coord[x, y][
-                    ..., x3_start:x3_stop, x2_start:x2_stop, :
-                ]
-            )
+            row.append(tiles_by_coord[x, y][..., x3_start:x3_stop, x2_start:x2_stop, :])
         rows.append(torch.cat(row, dim=-2))
     return torch.cat(rows, dim=-3).contiguous()
 
@@ -235,8 +233,7 @@ def _shrink_face(
             output[name] = _shrink_spatial_tensor(source_tensors, n, nghost)
         else:
             if not all(
-                torch.equal(source_tensors[0], tensor)
-                for tensor in source_tensors[1:]
+                torch.equal(source_tensors[0], tensor) for tensor in source_tensors[1:]
             ):
                 raise ValueError(f"metadata tensor {name} differs within face {face}")
             output[name] = source_tensors[0]
@@ -329,9 +326,7 @@ def shrink_cubed_sphere_restart(
         prefix=f".{output.name}.shrink-", dir=output.parent
     ) as temporary_directory:
         temporary = Path(temporary_directory)
-        part_paths = [
-            temporary / f"block{face}.part" for face in range(FACE_COUNT)
-        ]
+        part_paths = [temporary / f"block{face}.part" for face in range(FACE_COUNT)]
         with ProcessPoolExecutor(max_workers=FACE_COUNT) as executor:
             futures = [
                 executor.submit(

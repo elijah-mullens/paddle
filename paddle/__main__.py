@@ -23,15 +23,15 @@ def cubed_sphere_remap_main(argv: Sequence[str] | None = None) -> int:
 
 
 def refine_main(argv: Sequence[str] | None = None) -> int:
-    from .restart_resize import refine_main
+    from .restart_resize import refine_main as restart_refine_main
 
-    return refine_main(argv)
+    return restart_refine_main(argv)
 
 
 def coarsen_main(argv: Sequence[str] | None = None) -> int:
-    from .restart_resize import coarsen_main
+    from .restart_resize import coarsen_main as restart_coarsen_main
 
-    return coarsen_main(argv)
+    return restart_coarsen_main(argv)
 
 
 def monitor_main(argv: Sequence[str] | None = None) -> int:

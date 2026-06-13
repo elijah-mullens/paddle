@@ -13,7 +13,7 @@ from paddle.cubed_sphere_shrink import (
     _write_bundle,
     read_restart_bundle_index,
 )
-from paddle.restart_resize import resize_restart, resize_spatial_tensor
+from paddle.restart_resize import build_parser, resize_restart, resize_spatial_tensor
 
 
 def test_refine_doubles_only_horizontal_interior() -> None:
@@ -42,6 +42,25 @@ def test_coarsen_averages_two_by_two_interior() -> None:
 def test_coarsen_rejects_odd_interior() -> None:
     with pytest.raises(ValueError, match="even horizontal"):
         resize_spatial_tensor(torch.ones((1, 7, 6, 1)), mode="coarsen", nghost=1)
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_shape"),
+    [("refine", (1, 8, 12, 1)), ("coarsen", (1, 2, 3, 1))],
+)
+def test_resize_without_ghost_zones(mode, expected_shape) -> None:
+    source = torch.ones((1, 4, 6, 1), dtype=torch.float64)
+
+    result = resize_spatial_tensor(source, mode=mode, nghost=0)
+
+    assert result.shape == expected_shape
+    torch.testing.assert_close(result, torch.ones_like(result))
+
+
+def test_resize_parser_uses_entry_point_name(monkeypatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["paddle-refine"])
+
+    assert build_parser("refine").prog == "paddle-refine"
 
 
 class _FakeValue:
