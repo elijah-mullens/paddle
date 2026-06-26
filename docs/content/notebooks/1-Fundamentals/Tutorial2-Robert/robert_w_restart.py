@@ -39,7 +39,7 @@ op.output_dir(output_directory)
 block = MeshBlock(op)
 
 # use cuda if available
-if torch.cuda.is_available() and op.layout().backend() == "nccl":
+if torch.cuda.is_available() and op.layout().backend() == "ucx":
     device = torch.device(block.device())
 else:
     device = torch.device("cpu")

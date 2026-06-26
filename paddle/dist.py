@@ -6,6 +6,16 @@ import torch.distributed.distributed_c10d as dist_c10d
 import snapy
 
 
+def _register_ucx_backend() -> None:
+    try:
+        import commux
+    except ImportError as exc:
+        raise RuntimeError(
+            "UCX backend requires commux. Install commux or use backend='gloo'."
+        ) from exc
+    commux.register()
+
+
 def start_dist(backend: str) -> torch.device:
     os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
     os.environ.setdefault("MASTER_PORT", "29501")
@@ -18,14 +28,14 @@ def start_dist(backend: str) -> torch.device:
     if backend == "gloo":
         dist.init_process_group(backend="gloo", init_method="env://")
         device = torch.device("cpu")
-    elif backend == "nccl":
-        if not torch.cuda.is_available():
-            raise RuntimeError("NCCL backend requires CUDA")
-        torch.cuda.set_device(device_id)
-        device = torch.device(f"cuda:{device_id}")
-        dist.init_process_group(
-            backend="cpu:gloo,cuda:nccl", device_id=device, init_method="env://"
-        )
+    elif backend == "ucx":
+        _register_ucx_backend()
+        if torch.cuda.is_available():
+            torch.cuda.set_device(device_id)
+            device = torch.device(f"cuda:{device_id}")
+        else:
+            device = torch.device("cpu")
+        dist.init_process_group(backend="ucx", init_method="env://")
     else:
         raise ValueError("Unsupported backend")
 

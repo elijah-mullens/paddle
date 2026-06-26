@@ -5,7 +5,7 @@ pip install paddle
 
 for a test, go to examples_py_scripts
 
-pd-run 2 python straka.py
+torchrun --nproc_per_node=2 straka.py
 
 conda install -c conda-forge nco
 

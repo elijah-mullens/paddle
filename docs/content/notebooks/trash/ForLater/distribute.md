@@ -9,7 +9,7 @@ The seventh dictionary entry, $\texttt{distribute}$, describes how parallel comp
 ```
 # Two choices for backend
 # 'gloo' for CPU parallel computing
-# 'nccl' for GPU
+# 'ucx' for GPU
 backend = 'gloo'
 
 # Two choices for layout

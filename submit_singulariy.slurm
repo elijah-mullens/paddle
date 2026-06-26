@@ -34,11 +34,11 @@ echo "MASTER_PORT=${MASTER_PORT}"
 echo "NNODES=${NNODES}  GPUS_PER_NODE=${GPUS_PER_NODE}  WORLD_SIZE=${WORLD_SIZE}"
 echo "NODELIST=${SLURM_JOB_NODELIST}"
 
-# ---- Helpful NCCL/transport knobs (adjust to your cluster) ----
-# export NCCL_DEBUG=INFO
-# export NCCL_ASYNC_ERROR_HANDLING=1
-# export NCCL_IB_DISABLE=1                 # uncomment if no InfiniBand
-# export NCCL_SOCKET_IFNAME=ib0            # or eno1/bond0/etc
+# ---- Helpful UCX/transport knobs (adjust to your cluster) ----
+# export UCX_LOG_LEVEL=INFO
+# export UCX_WARN_UNUSED_ENV_VARS=n
+# export UCX_TLS=tcp                # uncomment if no InfiniBand
+# export UCX_NET_DEVICES=ib0            # or eno1/bond0/etc
 # export GLOO_SOCKET_IFNAME=ib0
 
 # ---- Launch one torchrun per node; torchrun spawns 2 procs on that node ----
