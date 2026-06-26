@@ -44,7 +44,9 @@ def test_start_dist_registers_commux_for_ucx_cuda(monkeypatch) -> None:
     monkeypatch.setitem(__import__("sys").modules, "commux", fake_commux)
     monkeypatch.setenv("LOCAL_RANK", "3")
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
-    monkeypatch.setattr(torch.cuda, "set_device", lambda device: calls.append(("cuda", device)))
+    monkeypatch.setattr(
+        torch.cuda, "set_device", lambda device: calls.append(("cuda", device))
+    )
     monkeypatch.setattr(
         paddle_dist.dist,
         "init_process_group",

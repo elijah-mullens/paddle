@@ -94,9 +94,9 @@ def _source_tensor(offset: float) -> torch.Tensor:
     for component in range(3):
         for x1 in range(4):
             tensor[component, :, :, x1] = offset + component * 100 + x1 * 10
-    tensor[:, 1:3, 1:4, :] += torch.arange(
-        2 * 3, dtype=torch.float64
-    ).reshape(1, 2, 3, 1)
+    tensor[:, 1:3, 1:4, :] += torch.arange(2 * 3, dtype=torch.float64).reshape(
+        1, 2, 3, 1
+    )
     return tensor
 
 
@@ -174,10 +174,7 @@ def test_only_vertical_momentum_gets_standard_deviation_perturbation(
     hydro_w = block["hydro_w"]
     source_blocks = _load_output(source)
     samples = torch.stack(
-        [
-            source_block["hydro_u"][..., 1:-1, 1:-1, :]
-            for source_block in source_blocks
-        ],
+        [source_block["hydro_u"][..., 1:-1, 1:-1, :] for source_block in source_blocks],
         dim=0,
     )
     hydro_u_mean = samples.mean(dim=(0, 2, 3))
@@ -196,10 +193,7 @@ def test_only_vertical_momentum_gets_standard_deviation_perturbation(
     )
 
     hydro_w_samples = torch.stack(
-        [
-            source_block["hydro_w"][..., 1:-1, 1:-1, :]
-            for source_block in source_blocks
-        ],
+        [source_block["hydro_w"][..., 1:-1, 1:-1, :] for source_block in source_blocks],
         dim=0,
     )
     hydro_w_mean = hydro_w_samples.mean(dim=(0, 2, 3))
@@ -209,7 +203,9 @@ def test_only_vertical_momentum_gets_standard_deviation_perturbation(
     )
 
 
-def test_seed_makes_vertical_momentum_deterministic(tmp_path: Path, monkeypatch) -> None:
+def test_seed_makes_vertical_momentum_deterministic(
+    tmp_path: Path, monkeypatch
+) -> None:
     config = tmp_path / "config.yaml"
     config.write_text("geometry: {}\n")
     source = tmp_path / "source.restart"
