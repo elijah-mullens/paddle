@@ -2,11 +2,11 @@ import argparse
 
 import torch
 import yaml
+from kintera import Kinetics, KineticsOptions, ThermoX
 from snapy import Mesh, MeshOptions, kICY, kIV1
-from kintera import ThermoX, KineticsOptions, Kinetics
 from paddle import (
-    setup_profile,
     evolve_kinetics,
+    setup_profile,
 )
 
 
