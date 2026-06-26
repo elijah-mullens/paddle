@@ -55,6 +55,7 @@ paddle-cs-expand = "paddle.cubed_sphere_expand:main"
 paddle-cs-remap = "paddle.cubed_sphere_remap:main"
 paddle-refine = "paddle.restart_resize:refine_main"
 paddle-coarsen = "paddle.restart_resize:coarsen_main"
+paddle-restart = "paddle.restart_horizontal_stats:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

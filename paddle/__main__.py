@@ -34,6 +34,12 @@ def coarsen_main(argv: Sequence[str] | None = None) -> int:
     return restart_coarsen_main(argv)
 
 
+def restart_main(argv: Sequence[str] | None = None) -> int:
+    from .restart_horizontal_stats import main
+
+    return main(argv)
+
+
 def monitor_main(argv: Sequence[str] | None = None) -> int:
     from .monitor import main
 
@@ -75,6 +81,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Halve a restart's horizontal resolution.",
     )
     subparsers.add_parser(
+        "restart",
+        add_help=False,
+        help="Create a restart from horizontal statistics of a source final state.",
+    )
+    subparsers.add_parser(
         "monitor",
         add_help=False,
         help="Monitor CPU, GPU, and disk usage on machines over SSH.",
@@ -100,6 +111,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return refine_main(remaining)
     if args.command == "coarsen":
         return coarsen_main(remaining)
+    if args.command == "restart":
+        return restart_main(remaining)
     if args.command == "monitor":
         return monitor_main(remaining)
     if args.command == "submit":
