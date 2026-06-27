@@ -23,14 +23,20 @@ def init_dist(backend: str) -> torch.device:
     if backend == "gloo":
         dist.init_process_group(backend="gloo", init_method="env://")
         device = torch.device("cpu")
-    elif backend == "nccl":
-        if not torch.cuda.is_available():
-            raise RuntimeError("NCCL backend requires CUDA")
-        torch.cuda.set_device(local_rank)
-        device = torch.device(f"cuda:{local_rank}")
-        dist.init_process_group(
-            backend="cpu:gloo,cuda:nccl", device_id=device, init_method="env://"
-        )
+    elif backend == "ucx":
+        try:
+            import commux
+        except ImportError as exc:
+            raise RuntimeError(
+                "UCX backend requires commux. Install commux or use backend='gloo'."
+            ) from exc
+        commux.register()
+        if torch.cuda.is_available():
+            torch.cuda.set_device(local_rank)
+            device = torch.device(f"cuda:{local_rank}")
+        else:
+            device = torch.device("cpu")
+        dist.init_process_group(backend="ucx", init_method="env://")
     else:
         raise ValueError("Unsupported backend")
 

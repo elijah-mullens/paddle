@@ -7,7 +7,7 @@ from snapy import MeshBlock, MeshBlockOptions, kIDN, kIPR
 
 
 def select_device(block: MeshBlock, options: MeshBlockOptions) -> torch.device:
-    if torch.cuda.is_available() and options.layout().backend() == "nccl":
+    if torch.cuda.is_available() and options.layout().backend() == "ucx":
         return torch.device(block.device())
     return torch.device("cpu")
 

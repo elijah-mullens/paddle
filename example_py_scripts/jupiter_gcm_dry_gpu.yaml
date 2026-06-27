@@ -25,11 +25,11 @@ geometry:
     nghost: 3
 
 distribute:
-  backend: nccl
+  backend: ucx
   layout: cubed-sphere
   nb2: 1
   nb3: 1
-  blocks_per_process: 6
+  blocks_per_process: 3
   verbose: false
 
 dynamics:

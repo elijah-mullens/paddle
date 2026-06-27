@@ -2,11 +2,11 @@ import argparse
 
 import torch
 import yaml
+from kintera import Kinetics, KineticsOptions, ThermoX
 from snapy import Mesh, MeshOptions, kICY, kIV1
-from kintera import ThermoX, KineticsOptions, Kinetics
 from paddle import (
-    setup_profile,
     evolve_kinetics,
+    setup_profile,
 )
 
 
@@ -39,7 +39,7 @@ def run_with(infile: str, restart_file: str):
     blocks = list(mesh.blocks)
 
     # use cuda if available
-    if torch.cuda.is_available() and block_options.layout().backend() == "nccl":
+    if torch.cuda.is_available() and block_options.layout().backend() == "ucx":
         device = torch.device(mesh.device())
         print("device = ", device)
     else:

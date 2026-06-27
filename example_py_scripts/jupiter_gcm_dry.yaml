@@ -29,6 +29,7 @@ distribute:
   layout: cubed-sphere
   nb2: 1
   nb3: 1
+  blocks_per_process: 3
   verbose: false
 
 dynamics:

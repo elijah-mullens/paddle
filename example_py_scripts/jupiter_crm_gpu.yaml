@@ -58,7 +58,7 @@ geometry:
   cells: {nx1: 20, nx2: 24, nx3: 24, nghost: 3}
 
 distribute:
-  backend: nccl
+  backend: ucx
   layout: slab
   nb2: 1
   nb3: 1

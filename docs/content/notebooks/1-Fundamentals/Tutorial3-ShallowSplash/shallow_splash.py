@@ -20,17 +20,23 @@ def init_dist(backend: str) -> torch.device:
     os.environ.setdefault("LOCAL_RANK", os.environ["RANK"])
 
     local_rank = int(os.environ["LOCAL_RANK"])
-    if backend == "nccl":
-        if not torch.cuda.is_available():
-            raise RuntimeError("NCCL backend requires CUDA")
-        torch.cuda.set_device(local_rank)
+    if backend == "ucx":
+        try:
+            import commux
+        except ImportError as exc:
+            raise RuntimeError(
+                "UCX backend requires commux. Install commux or use backend='gloo'."
+            ) from exc
+        commux.register()
+        if torch.cuda.is_available():
+            torch.cuda.set_device(local_rank)
 
     if not dist.is_initialized():
         dist.init_process_group(backend=backend, init_method="env://")
 
     snapy.distributed.set_process_group(dist_c10d._get_default_group())
 
-    if backend == "nccl":
+    if backend == "ucx" and torch.cuda.is_available():
         return torch.device(f"cuda:{local_rank}")
     return torch.device("cpu")
 
