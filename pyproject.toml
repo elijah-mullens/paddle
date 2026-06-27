@@ -31,8 +31,8 @@ classifiers = [
 ]
 
 dependencies = [
-  "torch>=2.7.0",
-  "snapy>=2.6.5",
+  "torch>=2.6.0",
+  "snapy>=2.8.2",
   "scipy",
   "netCDF4",
   "rich>=13"

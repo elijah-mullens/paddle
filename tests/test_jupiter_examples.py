@@ -13,6 +13,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_DIR = REPO_ROOT / "example_py_scripts"
 RUN_HYDRO = EXAMPLE_DIR / "run_hydro.py"
+GCM_NPROC = 2
 
 
 def _get_free_port() -> int:
@@ -47,7 +48,7 @@ def test_run_hydro_jupiter_cpu_examples(tmp_path: Path, yaml_name: str) -> None:
             "-m",
             "torch.distributed.run",
             "--standalone",
-            "--nproc_per_node=6",
+            f"--nproc_per_node={GCM_NPROC}",
             str(RUN_HYDRO),
             "-i",
             str(input_path),
