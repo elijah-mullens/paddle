@@ -5,9 +5,9 @@ import yaml
 from snapy import MeshBlock, MeshBlockOptions, kIDN, kIV2, kIV3
 
 
-def select_device(block: MeshBlock, options: MeshBlockOptions) -> torch.device:
+def select_device(options: MeshBlockOptions) -> torch.device:
     if torch.cuda.is_available() and options.layout().backend() == "ucx":
-        return torch.device(block.device())
+        return torch.device(options.device_str())
     return torch.device("cpu")
 
 
@@ -21,7 +21,7 @@ def run_with(infile: str) -> None:
 
     options = MeshBlockOptions.from_yaml(infile, verbose=False)
     block = MeshBlock(options)
-    device = select_device(block, options)
+    device = select_device(options)
     block.to(device)
 
     coord = block.module("coord")

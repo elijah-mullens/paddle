@@ -1,0 +1,85 @@
+reference-state:
+  Tref: 0.
+  Pref: 1.e5
+
+species:
+  - name: dry
+    composition: {O: 0.4200039819342909, N: 1.560014790041652, Ar: 0.01}
+    cv_R: 2.5
+
+  - name: H2O
+    composition: {H: 2, O: 1}
+    cv_R: 1.534301
+    u0_R: 0.
+
+  - name: H2O(l)
+    composition: {H: 2, O: 1}
+    cv_R: 7.52031
+    u0_R: -6786.6602
+
+geometry:
+  type: cartesian
+  bounds: {x1min: 0., x1max: 10.e3, x2min: 0., x2max: 20.e3, x3min: -0.5, x3max: 0.5}
+  cells: {nx1: 200, nx2: 400, nx3: 1, nghost: 3}
+
+distribute:
+  backend: ucx
+  layout: slab
+
+dynamics:
+  equation-of-state:
+    type: ideal-moist
+    density-floor: 1.e-10
+    pressure-floor: 1.e-10
+    tracer-floor: 1.e-10
+    limiter: true
+    max-iter: 20
+    ftol: 1.e-8
+
+  reconstruct:
+    vertical: {type: weno5, scale: false, shock: false}
+    horizontal: {type: weno5, scale: false, shock: false}
+
+  riemann-solver:
+    type: lmars
+
+boundary-condition:
+  external:
+    x1-inner: reflecting
+    x1-outer: reflecting
+    x2-inner: reflecting
+    x2-outer: reflecting
+    x3-inner: periodic
+    x3-outer: periodic
+
+integration:
+  type: rk3
+  cfl: 0.9
+  implicit-scheme: 1
+  nlim: -1
+  tlim: 1000.
+  ncycle_out: 10
+
+outputs:
+  - type: netcdf
+    variables: [prim, uov, thermo]
+    dt: 100.
+
+forcing:
+  const-gravity:
+    grav1: -9.81
+
+reactions:
+  - equation: H2O <=> H2O(l)
+    type: nucleation
+    rate-constant: {formula: h2o_bryan}
+
+problem:
+  dT: 2.0
+  xc: 10.e3
+  zc: 2.e3
+  xr: 2.e3
+  zr: 2.e3
+  p0: 1.e5
+  Ts: 289.85
+  qt: 0.0196

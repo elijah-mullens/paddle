@@ -1,5 +1,5 @@
 distribute:
-  backend: gloo
+  backend: ucx
   layout: slab
   nb2: 4
   nb3: 1
