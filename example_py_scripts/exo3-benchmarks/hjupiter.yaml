@@ -1,0 +1,85 @@
+reference-state:
+  Tref: 0.
+  Pref: 1.e5
+
+species:
+  - name: dry
+    composition: {H: 2, He: 0.05} # M=2.216 g/mol -> Rd=3752 (H2-dominated); cv_R=2.5 -> gamma=1.4
+    cv_R: 2.5
+    u0_R: 0.
+
+geometry:
+  type: gnomonic-equiangle
+
+  bounds:
+    x1min: 1.0e8
+    x1max: 1.03e8
+    x2min_pi: -0.25
+    x2max_pi: 0.25
+    x3min_pi: -0.25
+    x3max_pi: 0.25
+
+  cells:
+    nx1: 32
+    nx2: 48
+    nx3: 48
+    nghost: 3
+
+distribute:
+  backend: ucx
+  layout: cubed-sphere
+  nb2: 1
+  nb3: 1
+  blocks_per_process: 6
+  verbose: false
+
+dynamics:
+  equation-of-state:
+    type: ideal-moist
+    density-floor: 1.e-12
+    pressure-floor: 1.e-8
+    tracer-floor: 1.e-12
+    limiter: true
+    max-iter: 20
+    ftol: 1.e-6
+
+  reconstruct:
+    vertical: {type: weno5, scale: true, shock: true}
+    horizontal: {type: weno5, scale: true, shock: true}
+
+  riemann-solver:
+    type: hllc
+
+boundary-condition:
+  external:
+    x1-inner: reflecting
+    x1-outer: reflecting
+    x2-inner: custom
+    x2-outer: custom
+    x3-inner: custom
+    x3-outer: custom
+
+integration:
+  type: rk3
+  cfl: 0.9
+  implicit-scheme: 9
+  nlim: -1
+  tlim: 5.184e7
+  ncycle_out: 500
+
+outputs:
+  - type: netcdf
+    variables: [prim]
+    dt: 1.728e6
+
+forcing:
+  const-gravity:
+    grav1: -8.0
+  coriolis:
+    type: xyz
+    omega1: 2.1e-5
+
+problem:
+  Ps: 1.0e5
+  Ts: 1600.
+  Tmin: 1200.

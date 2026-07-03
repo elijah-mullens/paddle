@@ -1,0 +1,61 @@
+geometry:
+  type: gnomonic-equiangle
+  bounds:
+    x1min: 6371000.0
+    x1max: 6371001.0
+    x2min_pi: -0.25
+    x2max_pi: 0.25
+    x3min_pi: -0.25
+    x3max_pi: 0.25
+  cells:
+    nx1: 1
+    nx2: 96
+    nx3: 96
+    nghost: 3
+distribute:
+  backend: ucx
+  layout: cubed-sphere
+  nb2: 1
+  nb3: 1
+  blocks_per_process: 6
+  verbose: false
+dynamics:
+  equation-of-state:
+    type: shallow-water
+  reconstruct:
+    vertical:
+      type: weno5
+      scale: false
+      shock: false
+    horizontal:
+      type: weno5
+      scale: false
+      shock: false
+  riemann-solver:
+    type: shallow-roe
+    dir: yz
+boundary-condition:
+  external:
+    x1-inner: reflecting
+    x1-outer: reflecting
+    x2-inner: custom
+    x2-outer: custom
+    x3-inner: custom
+    x3-outer: custom
+integration:
+  type: rk3
+  cfl: 0.7
+  nlim: -1
+  tlim: 3456000.0
+  ncycle_out: 200
+outputs:
+- type: netcdf
+  variables:
+  - prim
+  dt: 14400.0
+forcing:
+  coriolis:
+    type: xyz
+    omega1: 7.292e-05
+problem:
+  note: Williamson-1992 test case 6 Rossby-Haurwitz wave; IC set in driver
