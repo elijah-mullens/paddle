@@ -11,8 +11,12 @@ H2 species, hllc, vertical-implicit) + Coriolis. Forced by Newtonian relaxation
 IC: isothermal atmosphere at Ts. Expected: a strong prograde EQUATORIAL
 SUPER-ROTATING jet.
 """
-import argparse, os, yaml
-import numpy as np, torch
+import argparse
+import os
+
+import yaml
+import numpy as np
+import torch
 from snapy import Mesh, MeshOptions, kIDN, kIPR, kIV1, kIV2, kIV3
 from paddle import start_dist, close_dist, setup_profile
 
