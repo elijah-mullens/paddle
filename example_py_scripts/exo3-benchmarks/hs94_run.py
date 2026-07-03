@@ -161,5 +161,5 @@ if __name__ == "__main__":
     p.add_argument(
         "-c", "--config", default=os.path.join(os.path.dirname(__file__), "hs94.yaml")
     )
-    p.add_argument("--output-dir", default="/data/2026.JupiterCRM/hs94")
+    p.add_argument("--output-dir", default="out_hs94")
     run(p.parse_args())

@@ -165,5 +165,5 @@ if __name__ == "__main__":
         "--config",
         default=os.path.join(os.path.dirname(__file__), "hjupiter.yaml"),
     )
-    p.add_argument("--output-dir", default="/data/2026.JupiterCRM/hjupiter")
+    p.add_argument("--output-dir", default="out_hjupiter")
     run(p.parse_args())
