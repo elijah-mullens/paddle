@@ -14,4 +14,4 @@ __all__ = [
     "evolve_kinetics",
     "remap_cubed_sphere_files",
 ]
-__version__ = "1.3.8"
+__version__ = "1.3.9"
