@@ -33,9 +33,10 @@ def _base_env() -> dict[str, str]:
     return env
 
 
-def _write_yaml(tmp_path: Path, source_name: str, updates: dict) -> Path:
+def _write_yaml(tmp_path: Path, source_name: str | Path, updates: dict) -> Path:
+    source_path = EXAMPLE_DIR / source_name
     shutil.copy2(Path(kintera.__file__).parent / "data" / "nasa9.dat", tmp_path)
-    with open(EXAMPLE_DIR / source_name, "r", encoding="utf-8") as stream:
+    with open(source_path, "r", encoding="utf-8") as stream:
         config = yaml.safe_load(stream)
     for key, value in updates.items():
         cursor = config
@@ -50,14 +51,14 @@ def _write_yaml(tmp_path: Path, source_name: str, updates: dict) -> Path:
             cursor[int(leaf)] = value
         else:
             cursor[leaf] = value
-    target = tmp_path / source_name
+    target = tmp_path / Path(source_name).name
     with open(target, "w", encoding="utf-8") as stream:
         yaml.safe_dump(config, stream, sort_keys=False)
     return target
 
 
 def _run_single(
-    script_name: str, yaml_path: Path | None, extra_args: list[str] | None = None
+    script_name: str | Path, yaml_path: Path | None, extra_args: list[str] | None = None
 ) -> None:
     env = _base_env()
     env["MASTER_ADDR"] = "127.0.0.1"
@@ -81,7 +82,7 @@ def _run_single(
     )
 
 
-def _run_distributed(script_name: str, yaml_path: Path, nproc: int) -> None:
+def _run_distributed(script_name: str | Path, yaml_path: Path, nproc: int) -> None:
     env = _base_env()
     cmd = [
         sys.executable,
@@ -121,7 +122,7 @@ def test_shock_script(tmp_path: Path) -> None:
 def test_straka_script(tmp_path: Path) -> None:
     yaml_path = _write_yaml(
         tmp_path,
-        "straka.yaml",
+        Path("snap-benchmarks/straka.yaml"),
         {
             "geometry.cells.nx1": 24,
             "geometry.cells.nx2": 48,
@@ -131,13 +132,13 @@ def test_straka_script(tmp_path: Path) -> None:
             "outputs.1.dt": 5.0,
         },
     )
-    _run_single("straka.py", yaml_path)
+    _run_single(Path("snap-benchmarks/straka.py"), yaml_path)
 
 
 def test_robert_script(tmp_path: Path) -> None:
     yaml_path = _write_yaml(
         tmp_path,
-        "robert.yaml",
+        Path("snap-benchmarks/robert.yaml"),
         {
             "geometry.cells.nx1": 48,
             "geometry.cells.nx2": 48,
@@ -149,7 +150,7 @@ def test_robert_script(tmp_path: Path) -> None:
             "outputs.1.dt": 5.0,
         },
     )
-    _run_distributed("robert.py", yaml_path, nproc=4)
+    _run_distributed(Path("snap-benchmarks/robert.py"), yaml_path, nproc=4)
 
 
 def test_shallow_yz_script(tmp_path: Path) -> None:
