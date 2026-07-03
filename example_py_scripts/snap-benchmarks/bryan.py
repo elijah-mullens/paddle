@@ -181,7 +181,9 @@ def initialize_block(
             dz = dx1f[i].item()
             thermo_x.extrapolate_dz(temp, pres, xfrac, dz, grav, 0.0, False)
 
-    x2 = coord.buffer("x2v").to(device=device, dtype=dtype).view(1, nc2).expand(nc3, nc2)
+    x2 = (
+        coord.buffer("x2v").to(device=device, dtype=dtype).view(1, nc2).expand(nc3, nc2)
+    )
     rd = float(8.31446261815324 / thermo_x.mu[0].item())
 
     for i in range(il, iu + 1):
