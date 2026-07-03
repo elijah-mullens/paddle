@@ -11,8 +11,12 @@ source on the conserved state each step (matching the ExoCubed `Forcing`).
 IC: dry-adiabatic hydrostatic profile (theta=Ts up to z_iso, then isothermal),
 seeded with small random horizontal velocity.
 """
-import argparse, os, yaml
-import numpy as np, torch
+import argparse
+import os
+
+import yaml
+import numpy as np
+import torch
 from snapy import Mesh, MeshOptions, kIDN, kIPR, kIV1, kIV2, kIV3
 from paddle import start_dist, close_dist, setup_profile
 
