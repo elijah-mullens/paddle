@@ -10,7 +10,10 @@ using snapy's exact (face,xi,eta)->(lon,lat) map; physical (U,V) east/north are
 converted to snapy contravariant (vel2,vel3) by inverting the validated
 elijah-mullens/paddle contra->geographic rotation per cell.
 """
-import argparse, os, yaml
+import argparse
+import os
+
+import yaml
 import numpy as np
 import torch
 from snapy import Mesh, MeshOptions
