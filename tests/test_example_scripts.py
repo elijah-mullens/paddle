@@ -135,6 +135,26 @@ def test_straka_script(tmp_path: Path) -> None:
     _run_single(Path("snap-benchmarks/straka.py"), yaml_path)
 
 
+def test_straka_refinement_script(tmp_path: Path) -> None:
+    yaml_path = _write_yaml(
+        tmp_path,
+        "straka.yaml",
+        {
+            "geometry.cells.nx1": 24,
+            "geometry.cells.nx2": 24,
+            "integration.nlim": -1,
+            "integration.tlim": 0.2,
+            "outputs.0.dt": 0.1,
+            "outputs.1.dt": 0.1,
+        },
+    )
+    _run_single(
+        "straka_refinement.py",
+        yaml_path,
+        extra_args=["--refine-time", "0.1"],
+    )
+
+
 def test_robert_script(tmp_path: Path) -> None:
     yaml_path = _write_yaml(
         tmp_path,
