@@ -16,6 +16,23 @@ def _register_ucx_backend() -> None:
     commux.register()
 
 
+def _ucx_device(device_id: int) -> torch.device:
+    cuda_requested = os.environ.get("DEVICE", "").lower() == "cuda" or (
+        "DEVICE_ID" in os.environ
+    )
+    if not cuda_requested:
+        return torch.device("cpu")
+
+    if not torch.cuda.is_available():
+        raise RuntimeError(
+            "CUDA requested for UCX backend via DEVICE=cuda or DEVICE_ID, "
+            "but torch.cuda.is_available() is false."
+        )
+
+    torch.cuda.set_device(device_id)
+    return torch.device(f"cuda:{device_id}")
+
+
 def start_dist(backend: str) -> torch.device:
     os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
     os.environ.setdefault("MASTER_PORT", "29501")
@@ -30,11 +47,7 @@ def start_dist(backend: str) -> torch.device:
         device = torch.device("cpu")
     elif backend == "ucx":
         _register_ucx_backend()
-        if torch.cuda.is_available():
-            torch.cuda.set_device(device_id)
-            device = torch.device(f"cuda:{device_id}")
-        else:
-            device = torch.device("cpu")
+        device = _ucx_device(device_id)
         dist.init_process_group(backend="ucx", init_method="env://")
     else:
         raise ValueError("Unsupported backend")
