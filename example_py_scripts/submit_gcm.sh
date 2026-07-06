@@ -12,7 +12,7 @@ if [[ $# -lt 1 ]]; then
   echo "  GPUS_PER_NODE=2"
   echo "  MASTER_ADDR=dart1"
   echo "  MASTER_PORT=29500"
-  echo "  WORKDIR=$(pwd)"
+  echo "  WORKDIR=$(pwd)  # defaults to the directory where this launcher is submitted"
   exit 2
 fi
 
@@ -22,7 +22,10 @@ GPUS_PER_NODE=${GPUS_PER_NODE:-2}
 MASTER_ADDR=${MASTER_ADDR:-${NODES[0]}}
 MASTER_PORT=${MASTER_PORT:-29500}
 RDZV_ID=${RDZV_ID:-paddle-$(date +%Y%m%d%H%M%S)-$$}
-WORKDIR=${WORKDIR:-$(pwd)}
+SUBMIT_DIR=$(pwd)
+WORKDIR=${WORKDIR:-${SUBMIT_DIR}}
+LOCAL_HOST=$(hostname)
+LOCAL_SHORT_HOST=$(hostname -s)
 
 if [[ ${NNODES} -ne 3 ]]; then
   echo "Expected exactly 3 nodes, got ${NNODES}: ${NODES[*]}" >&2
@@ -53,6 +56,7 @@ echo "Nodes: ${NODES[*]}"
 echo "MASTER_ADDR=${MASTER_ADDR}"
 echo "MASTER_PORT=${MASTER_PORT}"
 echo "RDZV_ID=${RDZV_ID}"
+echo "SUBMIT_DIR=${SUBMIT_DIR}"
 echo "WORKDIR=${WORKDIR}"
 echo "TRAIN=${TRAIN_CMD}"
 
@@ -84,8 +88,12 @@ for node_rank in "${!NODES[@]}"; do
       ${TRAIN_CMD}
   "
 
-  ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -- "${node}" \
-    "bash -lc $(printf "%q" "${remote_command}")" &
+  if [[ "${node}" == "${LOCAL_HOST}" || "${node}" == "${LOCAL_SHORT_HOST}" ]]; then
+    bash -lc "${remote_command}" &
+  else
+    ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -- "${node}" \
+      "bash -lc $(printf "%q" "${remote_command}")" &
+  fi
   pids+=("$!")
 done
 
