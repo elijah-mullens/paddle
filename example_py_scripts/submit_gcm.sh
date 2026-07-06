@@ -12,6 +12,7 @@ if [[ $# -lt 1 ]]; then
   echo "  GPUS_PER_NODE=2"
   echo "  MASTER_ADDR=dart1"
   echo "  MASTER_PORT=29500"
+  echo "  LOCAL_NODE=\${PADDLE_NODES%% *}  # node alias for the submit host"
   echo "  WORKDIR=$(pwd)  # defaults to the directory where this launcher is submitted"
   exit 2
 fi
@@ -26,6 +27,7 @@ SUBMIT_DIR=$(pwd)
 WORKDIR=${WORKDIR:-${SUBMIT_DIR}}
 LOCAL_HOST=$(hostname)
 LOCAL_SHORT_HOST=$(hostname -s)
+LOCAL_NODE=${LOCAL_NODE:-${NODES[0]}}
 
 if [[ ${NNODES} -ne 3 ]]; then
   echo "Expected exactly 3 nodes, got ${NNODES}: ${NODES[*]}" >&2
@@ -48,6 +50,29 @@ quote_args() {
   printf "%s " "${quoted[@]}"
 }
 
+is_local_node() {
+  local node=$1
+
+  if [[ "${node}" == "${LOCAL_NODE}" || "${node}" == "${LOCAL_HOST}" || "${node}" == "${LOCAL_SHORT_HOST}" ]]; then
+    return 0
+  fi
+
+  if command -v getent >/dev/null 2>&1; then
+    local local_ips node_ips
+    local_ips=$(hostname -I 2>/dev/null || true)
+    node_ips=$(getent ahosts "${node}" 2>/dev/null | awk '{print $1}' | sort -u || true)
+    for node_ip in ${node_ips}; do
+      for local_ip in ${local_ips}; do
+        if [[ "${node_ip}" == "${local_ip}" ]]; then
+          return 0
+        fi
+      done
+    done
+  fi
+
+  return 1
+}
+
 TRAIN_CMD="$(quote_args "${TRAIN_SCRIPT}" "$@")"
 REMOTE_PREFIX='if [[ -f "${HOME}/.bash_profile" ]]; then source "${HOME}/.bash_profile"; fi'
 
@@ -58,6 +83,8 @@ echo "MASTER_PORT=${MASTER_PORT}"
 echo "RDZV_ID=${RDZV_ID}"
 echo "SUBMIT_DIR=${SUBMIT_DIR}"
 echo "WORKDIR=${WORKDIR}"
+echo "LOCAL_NODE=${LOCAL_NODE}"
+echo "LOCAL_HOST=${LOCAL_HOST}"
 echo "TRAIN=${TRAIN_CMD}"
 
 pids=()
@@ -88,7 +115,7 @@ for node_rank in "${!NODES[@]}"; do
       ${TRAIN_CMD}
   "
 
-  if [[ "${node}" == "${LOCAL_HOST}" || "${node}" == "${LOCAL_SHORT_HOST}" ]]; then
+  if is_local_node "${node}"; then
     bash -lc "${remote_command}" &
   else
     ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -- "${node}" \
