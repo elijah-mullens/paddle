@@ -12,6 +12,7 @@ if [[ $# -lt 1 ]]; then
   echo "  GPUS_PER_NODE=2"
   echo "  MASTER_ADDR=<submit-node-ip>  # defaults to an IPv4 address on the submit host"
   echo "  MASTER_PORT=29500"
+  echo "  USE_SSH_TUNNEL=1  # forward remote localhost:MASTER_PORT to submit localhost:MASTER_PORT"
   echo "  LOCAL_NODE=\${PADDLE_NODES%% *}  # node alias for the submit host"
   echo "  WORKDIR=$(pwd)  # defaults to the directory where this launcher is submitted"
   exit 2
@@ -21,6 +22,7 @@ read -r -a NODES <<< "${PADDLE_NODES:-dart2 dart3 dart1}"
 NNODES=${#NODES[@]}
 GPUS_PER_NODE=${GPUS_PER_NODE:-2}
 MASTER_PORT=${MASTER_PORT:-29500}
+USE_SSH_TUNNEL=${USE_SSH_TUNNEL:-1}
 SUBMIT_DIR=$(pwd)
 WORKDIR=${WORKDIR:-${SUBMIT_DIR}}
 LOCAL_HOST=$(hostname)
@@ -101,6 +103,7 @@ echo "Launching ${NNODES} nodes x ${GPUS_PER_NODE} GPUs = $((NNODES * GPUS_PER_N
 echo "Nodes: ${NODES[*]}"
 echo "MASTER_ADDR=${MASTER_ADDR}"
 echo "MASTER_PORT=${MASTER_PORT}"
+echo "USE_SSH_TUNNEL=${USE_SSH_TUNNEL}"
 echo "SUBMIT_DIR=${SUBMIT_DIR}"
 echo "WORKDIR=${WORKDIR}"
 echo "LOCAL_NODE=${LOCAL_NODE}"
@@ -117,6 +120,11 @@ trap cleanup INT TERM
 
 for node_rank in "${!NODES[@]}"; do
   node=${NODES[${node_rank}]}
+  torch_master_addr=${MASTER_ADDR}
+  if [[ "${USE_SSH_TUNNEL}" == "1" ]]; then
+    torch_master_addr=127.0.0.1
+  fi
+
   remote_command="
     set -euo pipefail
     ${REMOTE_PREFIX}
@@ -129,7 +137,7 @@ for node_rank in "${!NODES[@]}"; do
       --nnodes=${NNODES} \
       --nproc_per_node=${GPUS_PER_NODE} \
       --node_rank=${node_rank} \
-      --master_addr=${MASTER_ADDR} \
+      --master_addr=${torch_master_addr} \
       --master_port=${MASTER_PORT} \
       ${TRAIN_CMD}
   "
@@ -137,7 +145,17 @@ for node_rank in "${!NODES[@]}"; do
   if is_local_node "${node}"; then
     bash -lc "${remote_command}" &
   else
-    ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -- "${node}" \
+    ssh_args=(
+      -o BatchMode=yes
+      -o StrictHostKeyChecking=accept-new
+    )
+    if [[ "${USE_SSH_TUNNEL}" == "1" ]]; then
+      ssh_args+=(
+        -o ExitOnForwardFailure=yes
+        -R "127.0.0.1:${MASTER_PORT}:127.0.0.1:${MASTER_PORT}"
+      )
+    fi
+    ssh "${ssh_args[@]}" -- "${node}" \
       "bash -lc $(printf "%q" "${remote_command}")" &
   fi
   pids+=("$!")
