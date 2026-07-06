@@ -12,6 +12,7 @@ from paddle import (
     setup_profile,
     evolve_kinetics,
 )
+from spherical_random import randomize_initial_velocity
 
 
 @dataclass(frozen=True)
@@ -71,7 +72,7 @@ def run_with(args: argparse.Namespace):
         block_vars = []
         for block in mesh.blocks:
             hydro_w = setup_profile(block, param, method="pseudo-adiabat")
-            hydro_w[kIV1] += 0.1 * torch.rand_like(hydro_w[kIV1])
+            hydro_w[kIV1] += randomize_initial_velocity(block, hydro_w[kIV1])
             block_vars.append({"hydro_w": hydro_w})
         block_vars, current_time = mesh.initialize(block_vars)
 
