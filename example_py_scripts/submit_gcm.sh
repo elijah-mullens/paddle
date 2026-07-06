@@ -8,12 +8,12 @@ if [[ $# -lt 1 ]]; then
   echo "  $0 run_jupiter_moist.py -c jupiter_gcm_H2O-NH3_F100.yaml --output-dir output_6gpu"
   echo
   echo "Optional environment variables:"
-  echo "  PADDLE_NODES='dart1 dart2 dart3'"
+  echo "  PADDLE_NODES='dart2 dart3 dart1'"
   echo "  GPUS_PER_NODE=2"
-  echo "  MASTER_ADDR=<submit-node-ip>  # defaults to an IPv4 address on the submit host"
+  echo "  MASTER_ADDR=dart2"
   echo "  MASTER_PORT=29500"
-  echo "  USE_SSH_TUNNEL=1  # forward remote localhost:MASTER_PORT to submit localhost:MASTER_PORT"
   echo "  LOCAL_NODE=\${PADDLE_NODES%% *}  # node alias for the submit host"
+  echo "  DIST_SOCKET_IFNAME=<routable interface>  # exports GLOO/NCCL/UCX interface vars"
   echo "  WORKDIR=$(pwd)  # defaults to the directory where this launcher is submitted"
   exit 2
 fi
@@ -21,36 +21,14 @@ fi
 read -r -a NODES <<< "${PADDLE_NODES:-dart2 dart3 dart1}"
 NNODES=${#NODES[@]}
 GPUS_PER_NODE=${GPUS_PER_NODE:-2}
+MASTER_ADDR=${MASTER_ADDR:-${NODES[0]}}
 MASTER_PORT=${MASTER_PORT:-29500}
-USE_SSH_TUNNEL=${USE_SSH_TUNNEL:-1}
 SUBMIT_DIR=$(pwd)
 WORKDIR=${WORKDIR:-${SUBMIT_DIR}}
 LOCAL_HOST=$(hostname)
 LOCAL_SHORT_HOST=$(hostname -s)
 LOCAL_NODE=${LOCAL_NODE:-${NODES[0]}}
-
-detect_master_addr() {
-  local ip_addr
-
-  for ip_addr in $(hostname -I 2>/dev/null || true); do
-    if [[ "${ip_addr}" != 127.* && "${ip_addr}" != ::1 ]]; then
-      printf "%s\n" "${ip_addr}"
-      return 0
-    fi
-  done
-
-  if command -v ip >/dev/null 2>&1; then
-    ip_addr=$(ip -o -4 addr show scope global 2>/dev/null | awk 'NR == 1 {split($4, a, "/"); print a[1]}')
-    if [[ -n "${ip_addr}" ]]; then
-      printf "%s\n" "${ip_addr}"
-      return 0
-    fi
-  fi
-
-  printf "%s\n" "${LOCAL_NODE}"
-}
-
-MASTER_ADDR=${MASTER_ADDR:-$(detect_master_addr)}
+DIST_SOCKET_IFNAME=${DIST_SOCKET_IFNAME:-}
 
 if [[ ${NNODES} -ne 3 ]]; then
   echo "Expected exactly 3 nodes, got ${NNODES}: ${NODES[*]}" >&2
@@ -103,11 +81,11 @@ echo "Launching ${NNODES} nodes x ${GPUS_PER_NODE} GPUs = $((NNODES * GPUS_PER_N
 echo "Nodes: ${NODES[*]}"
 echo "MASTER_ADDR=${MASTER_ADDR}"
 echo "MASTER_PORT=${MASTER_PORT}"
-echo "USE_SSH_TUNNEL=${USE_SSH_TUNNEL}"
 echo "SUBMIT_DIR=${SUBMIT_DIR}"
 echo "WORKDIR=${WORKDIR}"
 echo "LOCAL_NODE=${LOCAL_NODE}"
 echo "LOCAL_HOST=${LOCAL_HOST}"
+echo "DIST_SOCKET_IFNAME=${DIST_SOCKET_IFNAME:-<unset>}"
 echo "TRAIN=${TRAIN_CMD}"
 
 pids=()
@@ -120,9 +98,13 @@ trap cleanup INT TERM
 
 for node_rank in "${!NODES[@]}"; do
   node=${NODES[${node_rank}]}
-  torch_master_addr=${MASTER_ADDR}
-  if [[ "${USE_SSH_TUNNEL}" == "1" ]]; then
-    torch_master_addr=127.0.0.1
+  interface_exports=""
+  if [[ -n "${DIST_SOCKET_IFNAME}" ]]; then
+    interface_exports="
+    export GLOO_SOCKET_IFNAME=$(printf "%q" "${DIST_SOCKET_IFNAME}")
+    export NCCL_SOCKET_IFNAME=$(printf "%q" "${DIST_SOCKET_IFNAME}")
+    export UCX_NET_DEVICES=$(printf "%q" "${DIST_SOCKET_IFNAME}")
+    "
   fi
 
   remote_command="
@@ -132,12 +114,15 @@ for node_rank in "${!NODES[@]}"; do
     export CUDA_VISIBLE_DEVICES=\${CUDA_VISIBLE_DEVICES:-0,1}
     export OMP_NUM_THREADS=\${OMP_NUM_THREADS:-1}
     export MKL_NUM_THREADS=\${MKL_NUM_THREADS:-1}
+    ${interface_exports}
     echo \"[\$(hostname)] node_rank=${node_rank} starting torchrun\"
+    echo \"[\$(hostname)] MASTER_ADDR=${MASTER_ADDR} MASTER_PORT=${MASTER_PORT}\"
+    echo \"[\$(hostname)] GLOO_SOCKET_IFNAME=\${GLOO_SOCKET_IFNAME:-<unset>}\"
     torchrun \
       --nnodes=${NNODES} \
       --nproc_per_node=${GPUS_PER_NODE} \
       --node_rank=${node_rank} \
-      --master_addr=${torch_master_addr} \
+      --master_addr=${MASTER_ADDR} \
       --master_port=${MASTER_PORT} \
       ${TRAIN_CMD}
   "
@@ -145,17 +130,7 @@ for node_rank in "${!NODES[@]}"; do
   if is_local_node "${node}"; then
     bash -lc "${remote_command}" &
   else
-    ssh_args=(
-      -o BatchMode=yes
-      -o StrictHostKeyChecking=accept-new
-    )
-    if [[ "${USE_SSH_TUNNEL}" == "1" ]]; then
-      ssh_args+=(
-        -o ExitOnForwardFailure=yes
-        -R "127.0.0.1:${MASTER_PORT}:127.0.0.1:${MASTER_PORT}"
-      )
-    fi
-    ssh "${ssh_args[@]}" -- "${node}" \
+    ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -- "${node}" \
       "bash -lc $(printf "%q" "${remote_command}")" &
   fi
   pids+=("$!")
