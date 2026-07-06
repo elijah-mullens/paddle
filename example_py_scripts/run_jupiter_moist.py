@@ -1,13 +1,24 @@
 import argparse
-
-import torch
 import yaml
-from kintera import Kinetics, KineticsOptions, ThermoX
+import torch
+from dataclasses import dataclass
+
 from snapy import Mesh, MeshOptions, kICY, kIV1
+from snapy import EquationOfState
+from kintera import ThermoX, ThermoY, KineticsOptions, Kinetics
 from paddle import (
-    evolve_kinetics,
+    start_dist,
+    close_dist,
     setup_profile,
+    evolve_kinetics,
 )
+
+
+@dataclass(frozen=True)
+class ThermoConfigs:
+    eos: EquationOfState
+    thermo_x: ThermoX
+    thermo_y: ThermoY
 
 
 def call_user_output(bvars: dict[str, torch.Tensor]):
@@ -17,7 +28,7 @@ def call_user_output(bvars: dict[str, torch.Tensor]):
     return out
 
 
-def make_params(config: dict, species: list[str]) -> dict[str, float]:
+def make_problem_params(config: dict, species: list[str]) -> dict[str, float]:
     param = {
         "Ts": float(config["problem"]["Ts"]),
         "Ps": float(config["problem"]["Ps"]),
@@ -29,60 +40,52 @@ def make_params(config: dict, species: list[str]) -> dict[str, float]:
     return param
 
 
-def run_with(infile: str, restart_file: str):
-    with open(infile, "r", encoding="utf-8") as f:
+def run_with(args: argparse.Namespace):
+    with open(args.config, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    options = MeshOptions.from_yaml(infile)
+    device = start_dist(config["distribute"].get("backend", "gloo"))
+
+    options = MeshOptions.from_yaml(args.config)
+    options.block().output_dir(args.output_dir)
+
     mesh = Mesh(options)
-    block_options = options.block()
-    blocks = list(mesh.blocks)
-
-    # use cuda if available
-    if torch.cuda.is_available() and block_options.layout().backend() == "ucx":
-        device = torch.device(options.device_str())
-        print("device = ", device)
-    else:
-        device = torch.device("cpu")
-
     mesh.to(device)
 
-    thermo_modules = []
-    for block in blocks:
+    thermo_configs: list[ThermoConfigs] = []
+    for block in mesh.blocks:
         thermo_y = block.module("hydro.eos.thermo")
         thermo_x = ThermoX(thermo_y.options)
         thermo_x.to(device)
-        thermo_modules.append(
-            {
-                "eos": block.module("hydro.eos"),
-                "thermo_y": thermo_y,
-                "thermo_x": thermo_x,
-            }
+        thermo_configs.append(
+            ThermoConfigs(
+                eos=block.module("hydro.eos"), thermo_y=thermo_y, thermo_x=thermo_x
+            )
         )
 
-    if restart_file != "":
-        block_vars, current_time = mesh.initialize_from_restart(restart_file)
+    if args.restart != "":
+        block_vars, current_time = mesh.initialize_from_restart(args.restart)
     else:
-        species = thermo_modules[0]["thermo_y"].options.species()
-        param = make_params(config, species)
+        species = thermo_configs[0].thermo_y.options.species()
+        param: dict[str, float] = make_problem_params(config, species)
         block_vars = []
-        for block in blocks:
+        for block in mesh.blocks:
             hydro_w = setup_profile(block, param, method="pseudo-adiabat")
             hydro_w[kIV1] += 0.1 * torch.rand_like(hydro_w[kIV1])
             block_vars.append({"hydro_w": hydro_w})
         block_vars, current_time = mesh.initialize(block_vars)
 
-    for block in blocks:
+    for block in mesh.blocks:
         block.set_user_output_func(call_user_output)
 
     # kinetics model
-    op_kinet = KineticsOptions.from_yaml(infile)
+    op_kinet = KineticsOptions.from_yaml(args.config)
     kinet = Kinetics(op_kinet)
     kinet.to(device)
 
     intg = mesh.module("block0.intg")
     cycle = 0
-    if restart_file == "":
+    if args.restart == "":
         mesh.make_outputs(block_vars, current_time)
 
     while not intg.stop(cycle, current_time):
@@ -95,12 +98,12 @@ def run_with(infile: str, restart_file: str):
         for stage in range(len(intg.stages)):
             mesh.forward(block_vars, dt, stage)
 
-        for bvars, modules in zip(block_vars, thermo_modules):
+        for bvars, thermo in zip(block_vars, thermo_configs):
             del_rho = evolve_kinetics(
                 bvars["hydro_w"],
-                modules["eos"],
-                modules["thermo_x"],
-                modules["thermo_y"],
+                thermo.eos,
+                thermo.thermo_x,
+                thermo.thermo_y,
                 kinet,
                 dt,
             )
@@ -116,13 +119,26 @@ def run_with(infile: str, restart_file: str):
         mesh.make_outputs(block_vars, current_time)
 
     mesh.finalize(block_vars, current_time)
+    close_dist()
 
 
 def main():
     # parse arguments
     parser = argparse.ArgumentParser(description="Run hydrodynamic simulation.")
     parser.add_argument(
-        "-i", "--infile", type=str, required=True, help="Input YAML configuration file."
+        "-c",
+        "--config",
+        type=str,
+        required=True,
+        default="jupiter_crm.yaml",
+        help="Input YAML configuration file.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        required=False,
+        default="output",
+        help="Output directory",
     )
     parser.add_argument(
         "-r",
@@ -132,8 +148,7 @@ def main():
         help="Restart from restart dump.",
         default="",
     )
-    args = parser.parse_args()
-    run_with(args.infile, args.restart)
+    run_with(parser.parse_args())
 
 
 if __name__ == "__main__":
