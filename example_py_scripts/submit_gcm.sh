@@ -21,7 +21,6 @@ read -r -a NODES <<< "${PADDLE_NODES:-dart2 dart3 dart1}"
 NNODES=${#NODES[@]}
 GPUS_PER_NODE=${GPUS_PER_NODE:-2}
 MASTER_PORT=${MASTER_PORT:-29500}
-RDZV_ID=${RDZV_ID:-paddle-$(date +%Y%m%d%H%M%S)-$$}
 SUBMIT_DIR=$(pwd)
 WORKDIR=${WORKDIR:-${SUBMIT_DIR}}
 LOCAL_HOST=$(hostname)
@@ -102,7 +101,6 @@ echo "Launching ${NNODES} nodes x ${GPUS_PER_NODE} GPUs = $((NNODES * GPUS_PER_N
 echo "Nodes: ${NODES[*]}"
 echo "MASTER_ADDR=${MASTER_ADDR}"
 echo "MASTER_PORT=${MASTER_PORT}"
-echo "RDZV_ID=${RDZV_ID}"
 echo "SUBMIT_DIR=${SUBMIT_DIR}"
 echo "WORKDIR=${WORKDIR}"
 echo "LOCAL_NODE=${LOCAL_NODE}"
@@ -131,9 +129,8 @@ for node_rank in "${!NODES[@]}"; do
       --nnodes=${NNODES} \
       --nproc_per_node=${GPUS_PER_NODE} \
       --node_rank=${node_rank} \
-      --rdzv_backend=c10d \
-      --rdzv_id=$(printf "%q" "${RDZV_ID}") \
-      --rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT} \
+      --master_addr=${MASTER_ADDR} \
+      --master_port=${MASTER_PORT} \
       ${TRAIN_CMD}
   "
 
