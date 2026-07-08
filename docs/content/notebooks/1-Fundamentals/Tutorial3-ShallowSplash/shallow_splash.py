@@ -2,13 +2,14 @@ import argparse
 import os
 
 import numpy as np
-import snapy
 import torch
 import torch.distributed as dist
 import torch.distributed.distributed_c10d as dist_c10d
 import yaml
-from snapy import Mesh, MeshBlockOptions, MeshOptions
-from snapy import kIDN, kIV2, kIV3
+import snapy
+from snapy import Mesh, MeshOptions
+from snapy import kIDN as kIGP
+from snapy import kIV2, kIV3
 from snapy.coord import cs_ab_to_lonlat, get_cs_face_name
 
 
@@ -20,7 +21,10 @@ def init_dist(backend: str) -> torch.device:
     os.environ.setdefault("LOCAL_RANK", os.environ["RANK"])
 
     local_rank = int(os.environ["LOCAL_RANK"])
-    if backend == "ucx":
+    if backend == "gloo":
+        dist.init_process_group(backend="gloo", init_method="env://")
+        device = torch.device("cpu")
+    elif backend == "ucx":
         try:
             import commux
         except ImportError as exc:
@@ -30,29 +34,15 @@ def init_dist(backend: str) -> torch.device:
         commux.register()
         if torch.cuda.is_available():
             torch.cuda.set_device(local_rank)
-
-    if not dist.is_initialized():
-        dist.init_process_group(backend=backend, init_method="env://")
+            device = torch.device(f"cuda:{local_rank}")
+        else:
+            device = torch.device("cpu")
+        dist.init_process_group(backend="ucx", init_method="env://")
+    else:
+        raise ValueError("Unsupported backend")
 
     snapy.distributed.set_process_group(dist_c10d._get_default_group())
-
-    if backend == "ucx" and torch.cuda.is_available():
-        return torch.device(f"cuda:{local_rank}")
-    return torch.device("cpu")
-
-
-def build_mesh(input_file: str, output_dir: str) -> tuple[Mesh, dict]:
-    with open(input_file, "r", encoding="utf-8") as stream:
-        config = yaml.safe_load(stream)
-
-    block_options = MeshBlockOptions.from_yaml(input_file, verbose=False)
-    block_options.output_dir(output_dir)
-
-    mesh_options = MeshOptions()
-    mesh_options.block(block_options)
-    mesh_options.blocks_per_process(config["distribute"].get("blocks_per_process", 1))
-
-    return Mesh(mesh_options), config
+    return device
 
 
 def initialize_block(
@@ -80,8 +70,8 @@ def initialize_block(
     w = torch.zeros((nvar, nc3, nc2, nc1), device=device)
     gc_dist = r_planet * (np.pi / 2.0 - lat)
 
-    w[kIDN] = phi
-    w[kIDN][torch.logical_and(gc_dist < radius, lat > np.pi / 4.0)] += dphi
+    w[kIGP] = phi
+    w[kIGP][torch.logical_and(gc_dist < radius, lat > np.pi / 4.0)] += dphi
     w[kIV2] = 0.0
     w[kIV3] = 0.0
 
@@ -90,7 +80,7 @@ def initialize_block(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="shallow_splash.yaml")
+    parser.add_argument("--input", default="shallow_splash_made_in_notebook.yaml")
     parser.add_argument("--output-dir", default="./splash_results")
     args = parser.parse_args()
 
@@ -100,23 +90,27 @@ def main() -> None:
         config = yaml.safe_load(stream)
 
     device = init_dist(config["distribute"].get("backend", "gloo"))
-    mesh, config = build_mesh(args.input, args.output_dir)
+
+    options = MeshOptions.from_yaml(args.input, verbose=False)
+    options.block().output_dir(args.output_dir)
+
+    mesh = Mesh(options)
     mesh.to(device)
 
     block_vars = [initialize_block(block, config, device) for block in mesh.blocks]
     block_vars, current_time = mesh.initialize(block_vars)
     mesh.make_outputs(block_vars, current_time)
 
-    root = mesh.blocks[0]
+    intg = mesh.module("block0.intg")
     cycle = 0
-    while not root.intg.stop(cycle, current_time):
+    while not intg.stop(cycle, current_time):
         cycle += 1
         mesh.set_cycle(cycle)
 
         dt = mesh.max_time_step(block_vars)
         mesh.print_cycle_info(block_vars, current_time, dt)
 
-        for stage in range(len(root.intg.stages)):
+        for stage in range(len(intg.stages)):
             mesh.forward(block_vars, dt, stage)
 
         err = mesh.check_redo(block_vars)
