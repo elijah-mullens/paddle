@@ -47,7 +47,6 @@ outputs:
   - prim
   dt: 10000.0
 distribute:
-  backend: gloo
   layout: cubed-sphere
   nb2: 1
   nb3: 1

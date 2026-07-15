@@ -22,12 +22,6 @@ CPD = GAMMA / (GAMMA - 1.0) * RD
 CP_LIQUID = RCP_LIQUID * CPD
 
 
-def select_device(options: MeshOptions) -> torch.device:
-    if torch.cuda.is_available() and options.block().layout().backend() == "ucx":
-        return torch.device(options.device_str())
-    return torch.device("cpu")
-
-
 def species_offset(species: list[str], name: str) -> int:
     for index, species_name in enumerate(species[1:]):
         if species_name == name:
@@ -224,7 +218,7 @@ def run_with(infile: str, restart_file: str = "") -> None:
 
     options = MeshOptions.from_yaml(infile)
     mesh = Mesh(options)
-    device = select_device(options)
+    device = torch.device(options.device_str())
     mesh.to(device)
     blocks = list(mesh.blocks)
 

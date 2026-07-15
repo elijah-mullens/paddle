@@ -2,14 +2,9 @@ import torch
 from snapy import MeshBlockOptions, MeshBlock
 from snapy import kIDN, kIPR, kIV1, kIV2, kIV3
 
-# use cuda if available
-if torch.cuda.is_available():
-    device = torch.device("cuda:0")
-else:
-    device = torch.device("cpu")
-
 # set hydrodynamic model
 op = MeshBlockOptions.from_yaml("shock.yaml")
+device = torch.device(op.device_str())
 
 # initialize block
 block = MeshBlock(op)

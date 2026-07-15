@@ -6,12 +6,6 @@ from snapy import MeshBlock, MeshBlockOptions, kICY, kIV1
 from paddle import setup_profile
 
 
-def select_device(options: MeshBlockOptions) -> torch.device:
-    if torch.cuda.is_available() and options.layout().backend() == "ucx":
-        return torch.device(options.device_str())
-    return torch.device("cpu")
-
-
 def make_params(config: dict, species: list[str]) -> dict[str, float]:
     param = {
         "Ts": float(config["problem"]["Ts"]),
@@ -30,7 +24,7 @@ def run_with(infile: str) -> None:
 
     options = MeshBlockOptions.from_yaml(infile, verbose=False)
     block = MeshBlock(options)
-    device = select_device(options)
+    device = torch.device(options.device_str())
     block.to(device)
 
     thermo_y = block.module("hydro.eos.thermo")

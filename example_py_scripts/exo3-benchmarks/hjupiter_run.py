@@ -18,7 +18,7 @@ import yaml
 import numpy as np
 import torch
 from snapy import Mesh, MeshOptions, kIDN, kIPR, kIV1, kIV2, kIV3
-from paddle import start_dist, close_dist, setup_profile
+from paddle import setup_profile
 
 FACE_NAMES = ["+X", "+Y", "-X", "+Z", "-Y", "-Z"]
 
@@ -97,8 +97,8 @@ def hj_forcing(hw, hu, coslat, coslon, z, dt):
 def run(args):
     with open(args.config) as f:
         config = yaml.safe_load(f)
-    device = start_dist(config["distribute"].get("backend", "gloo"))
     opt = MeshOptions.from_yaml(args.config)
+    device = torch.device(opt.device_str())
     opt.block().output_dir(args.output_dir)
     mesh = Mesh(opt)
     mesh.to(device)
@@ -157,9 +157,6 @@ def run(args):
         current_time += dt
         mesh.make_outputs(block_vars, current_time)
     mesh.finalize(block_vars, current_time)
-    close_dist()
-
-
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument(

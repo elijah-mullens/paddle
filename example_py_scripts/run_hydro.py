@@ -35,15 +35,10 @@ def run_with(infile: str, restart_file: str):
 
     options = MeshOptions.from_yaml(infile)
     mesh = Mesh(options)
-    block_options = options.block()
     blocks = list(mesh.blocks)
 
-    # use cuda if available
-    if torch.cuda.is_available() and block_options.layout().backend() == "ucx":
-        device = torch.device(options.device_str())
-        print("device = ", device)
-    else:
-        device = torch.device("cpu")
+    device = torch.device(options.device_str())
+    print("device = ", device)
 
     mesh.to(device)
 

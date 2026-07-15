@@ -16,7 +16,6 @@ geometry:
     nghost: 3
 
 distribute:
-  backend: gloo
   layout: cubed-sphere
   nb2: 1
   nb3: 1

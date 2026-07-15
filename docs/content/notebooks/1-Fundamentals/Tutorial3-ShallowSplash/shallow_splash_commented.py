@@ -7,75 +7,14 @@ import os
 import numpy as np
 # Primary deep learning and tensor computation library
 import torch
-# PyTorch's core library for handling distributed multi-GPU/CPU training
-import torch.distributed as dist
-# PyTorch's internal C++ backend reference for distributed communication
-import torch.distributed.distributed_c10d as dist_c10d
 # Read and parse YAML configuration files
 import yaml
-# Core simulation engine package for this project
-import snapy
 # Import structures to manage the simulation mesh grid and its settings
 from snapy import Mesh, MeshOptions
 # Import specific indexes for accessing variables (Density, Velocity Y, Velocity Z)
 from snapy import kIDN, kIV2, kIV3
 # Import helper functions to convert grid points to Longitude/Latitude and find grid face names
 from snapy.coord import cs_ab_to_lonlat, get_cs_face_name
-
-# Defines a function to initialize the distributed computing environment and returns the device
-def init_dist(backend: str) -> torch.device:
-    # Set fallback IP address for the master node if not already defined by torchrun
-    os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
-    # Set fallback port number for process synchronization if not already defined
-    os.environ.setdefault("MASTER_PORT", "29501")
-    # Set fallback global rank to 0 (the primary supervisor process)
-    os.environ.setdefault("RANK", "0")
-    # Set fallback world size to 1 (assumes single-process execution if run without torchrun)
-    os.environ.setdefault("WORLD_SIZE", "1")
-    # Bind the local rank ID to the global rank ID by default
-    os.environ.setdefault("LOCAL_RANK", os.environ["RANK"])
-
-    # Cast the local rank string variable into an integer
-    local_rank = int(os.environ["LOCAL_RANK"])
-    # Condition to handle basic CPU-based parallel processing
-    if backend == "gloo":
-        # Initialize communication among processes using the standard PyTorch Gloo backend
-        dist.init_process_group(backend="gloo", init_method="env://")
-        # Assign calculations to the system CPU
-        device = torch.device("cpu")
-    # Condition to handle high-performance hardware-accelerated backends (like UCX)
-    elif backend == "ucx":
-        try:
-            # Attempt to import custom communication library for UCX
-            import commux
-        except ImportError as exc:
-            # Crash gracefully if the user attempts to use UCX without installing commux
-            raise RuntimeError(
-                "UCX backend requires commux. Install commux or use backend='gloo'."
-            ) from exc
-        # Register the commux backend into PyTorch's available network options
-        commux.register()
-        # Verify if a CUDA-capable GPU is available on the machine
-        if torch.cuda.is_available():
-            # Bind this specific parallel process to its corresponding GPU ID
-            torch.cuda.set_device(local_rank)
-            # Assign calculations to the bound GPU device
-            device = torch.device(f"cuda:{local_rank}")
-        else:
-            # Fall back to CPU if no GPU is found despite requesting UCX
-            device = torch.device("cpu")
-        # Initialize communication among processes using the UCX backend
-        dist.init_process_group(backend="ucx", init_method="env://")
-    else:
-        # Crash if an invalid backend string is specified in the YAML configuration
-        raise ValueError("Unsupported backend")
-
-    # Link the snapy simulation framework directly to PyTorch's default process network
-    snapy.distributed.set_process_group(dist_c10d._get_default_group())
-    # Return the selected processing device (CPU or specific GPU)
-    return device
-
-
 
 # Defines a function to set up physical values (like fluid depth or height) inside a sub-grid block
 def initialize_block(
@@ -149,11 +88,10 @@ def main() -> None:
         # Load the structured configuration dictionary into memory
         config = yaml.safe_load(stream)
 
-    # Initialize distributed network processes and pinpoint our computation device
-    device = init_dist(config["distribute"].get("backend", "gloo"))
-
     # Convert the raw input configuration file directly into a verified MeshOptions object instance
     options = MeshOptions.from_yaml(args.input, verbose=False)
+    # Use the device selected by the DEVICE and DEVICE_ID environment variables
+    device = torch.device(options.device_str())
     # Configure each internal block to output its tracking logs directly to the correct output folder
     options.block().output_dir(args.output_dir)
 
@@ -207,13 +145,6 @@ def main() -> None:
     # Clean up simulation allocations and finalize open telemetry files upon hitting target runtime boundaries
     mesh.finalize(block_vars, current_time)
 
-    # Verify if the parallel communication group infrastructure is running
-    if dist.is_initialized():
-        # Disconnect safely from the distributed network to avoid hanging processes
-        dist.destroy_process_group()
-
-
 # Safeguard to ensure this code executes only when launched directly (and not when imported elsewhere)
 if __name__ == "__main__":
     main()
-
