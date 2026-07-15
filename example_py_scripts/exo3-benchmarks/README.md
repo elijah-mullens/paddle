@@ -37,10 +37,19 @@ Pass `-c <config.yaml>` to override the default config (each driver defaults to
 the YAML next to it). Adjust `distribute` (`blocks_per_process`, `backend`) and
 `CUDA_VISIBLE_DEVICES` for multi-GPU.
 
+The process count and `blocks_per_process` must describe the six cube faces:
+use one process with `blocks_per_process: 6` (the supplied configs), or six
+processes with `blocks_per_process: 1`. In the latter case, launch with
+`torchrun --nproc_per_node=6 ...`. The `ucx` backend requires `commux`; use
+`gloo` for a CPU-only run.
+
 ## Expected results
 
-- **W92** — the Rossby–Haurwitz wave-4 pattern propagates eastward, retaining its
-  shape; geopotential and winds stay smooth across panel boundaries.
+- **W92** — the Rossby–Haurwitz wave-4 pattern propagates eastward at about
+  12.2 degrees/day (roughly 171 degrees by day 14). It is an exact solution of
+  the barotropic-vorticity equation, not of the shallow-water equations, so
+  some deformation and numerical damping are expected. Geopotential and winds
+  should remain bounded and smooth across panel boundaries.
 - **HS94** — relaxes to the classic Held–Suarez climate: midlatitude eddy-driven
   westerly jets and a realistic zonal-mean temperature structure.
 - **Hot Jupiter** — develops a strong prograde **equatorial superrotating jet**.
@@ -50,3 +59,7 @@ the YAML next to it). Adjust `distribute` (`blocks_per_process`, `backend`) and
 `snapy`, `paddle` (distributed/profile helpers and `paddle.cubed_sphere_remap`
 for the W92 contravariant↔geographic velocity rotation), `torch`, `numpy`,
 `pyyaml`.
+
+W92 requires `snapy>=2.7.4`. Earlier 2.7 releases lack either the spherical
+cross-panel velocity exchange or the corrected spherical Coriolis treatment;
+they may start successfully but produce incorrect dynamics.

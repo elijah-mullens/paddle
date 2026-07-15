@@ -112,13 +112,15 @@ def run(args):
 
     lats = []  # per-block (nc3,nc2,1) latitude
     block_vars = []
-    for f, block in enumerate(mesh.blocks):
+    for block in mesh.blocks:
+        layout = block.get_layout()
+        _, _, face_id = layout.loc_of(layout.options.rank())
         coord = block.module("coord")
         x1v = coord.buffer("x1v").cpu().numpy()
         x2v = coord.buffer("x2v").cpu().numpy()
         x3v = coord.buffer("x3v").cpu().numpy()
         alpha, beta = np.meshgrid(x2v, x3v)  # (nc3,nc2)
-        lat2d = ab_to_lat(FACE_NAMES[f], alpha, beta)  # (nc3,nc2)
+        lat2d = ab_to_lat(FACE_NAMES[face_id], alpha, beta)  # (nc3,nc2)
         lats.append(torch.from_numpy(lat2d[..., None]).to(device, torch.float64))
         # dry-adiabatic hydrostatic IC (theta=Ts up to where T hits Tmin, then isothermal)
         w = setup_profile(

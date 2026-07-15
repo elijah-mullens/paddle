@@ -135,15 +135,17 @@ def run(args):
     mesh.to(device)
 
     block_vars = []
-    for f, block in enumerate(mesh.blocks):
+    for block in mesh.blocks:
+        layout = block.get_layout()
+        _, _, face_id = layout.loc_of(layout.options.rank())
         coord = block.module("coord")
         x2v = coord.buffer("x2v").cpu().numpy()  # xi (nc2,)
         x3v = coord.buffer("x3v").cpu().numpy()  # eta (nc3,)
         nc2, nc3 = x2v.size, x3v.size
         alpha, beta = np.meshgrid(x2v, x3v)  # shape (nc3, nc2): [k,j]
-        lon, lat = ab_to_lonlat(FACE_NAMES[f], alpha, beta)
+        lon, lat = ab_to_lonlat(FACE_NAMES[face_id], alpha, beta)
         gh, U, V = rh_wave(lon, lat)
-        vel2, vel3 = uv_to_contra(f, alpha, beta, lon, lat, U, V)
+        vel2, vel3 = uv_to_contra(face_id, alpha, beta, lon, lat, U, V)
         w = torch.zeros((4, nc3, nc2, 1), dtype=torch.float64)
         w[0, :, :, 0] = torch.from_numpy(gh)
         w[1, :, :, 0] = 0.0
