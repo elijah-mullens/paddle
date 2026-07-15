@@ -46,7 +46,8 @@ integration:
   type: rk3
   cfl: 0.7
   nlim: -1
-  tlim: 3456000.0
+  # Williamson test case 6 standard comparison time: 14 days.
+  tlim: 1209600.0
   ncycle_out: 200
 outputs:
 - type: netcdf
