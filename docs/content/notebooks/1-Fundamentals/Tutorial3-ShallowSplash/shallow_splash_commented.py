@@ -1,20 +1,27 @@
 # Parse command-line arguments passed to the script
 import argparse
+
 # Interact with the operating system (set environment variables, create directories)
 import os
 
 # Perform optimized numerical array operations
 import numpy as np
+
 # Primary deep learning and tensor computation library
 import torch
+
 # Read and parse YAML configuration files
 import yaml
+
 # Import structures to manage the simulation mesh grid and its settings
 from snapy import Mesh, MeshOptions
+
 # Import specific indexes for accessing variables (Density, Velocity Y, Velocity Z)
 from snapy import kIDN, kIV2, kIV3
+
 # Import helper functions to convert grid points to Longitude/Latitude and find grid face names
 from snapy.coord import cs_ab_to_lonlat, get_cs_face_name
+
 
 # Defines a function to set up physical values (like fluid depth or height) inside a sub-grid block
 def initialize_block(
@@ -144,6 +151,7 @@ def main() -> None:
 
     # Clean up simulation allocations and finalize open telemetry files upon hitting target runtime boundaries
     mesh.finalize(block_vars, current_time)
+
 
 # Safeguard to ensure this code executes only when launched directly (and not when imported elsewhere)
 if __name__ == "__main__":

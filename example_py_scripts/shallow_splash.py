@@ -84,5 +84,6 @@ def main() -> None:
 
     mesh.finalize(block_vars, current_time)
 
+
 if __name__ == "__main__":
     main()

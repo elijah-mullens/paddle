@@ -17,6 +17,7 @@ import yaml
 import numpy as np
 import torch
 from snapy import Mesh, MeshOptions
+
 # paddle velocity rotation (contravariant -> global Cartesian)
 from paddle import cubed_sphere_remap as csr
 
@@ -170,6 +171,8 @@ def run(args):
         current_time += dt
         mesh.make_outputs(block_vars, current_time)
     mesh.finalize(block_vars, current_time)
+
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument(

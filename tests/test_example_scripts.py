@@ -38,7 +38,10 @@ def _base_env() -> dict[str, str]:
 
 
 def test_examples_use_environment_for_device_selection() -> None:
-    maintained_roots = [EXAMPLE_DIR, REPO_ROOT / "docs/content/notebooks/1-Fundamentals"]
+    maintained_roots = [
+        EXAMPLE_DIR,
+        REPO_ROOT / "docs/content/notebooks/1-Fundamentals",
+    ]
     stale_python = (
         "layout().backend()",
         'config["distribute"].get("backend"',

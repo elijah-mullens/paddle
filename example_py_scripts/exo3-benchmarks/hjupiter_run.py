@@ -157,6 +157,8 @@ def run(args):
         current_time += dt
         mesh.make_outputs(block_vars, current_time)
     mesh.finalize(block_vars, current_time)
+
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument(
