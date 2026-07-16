@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import shutil
@@ -30,7 +31,44 @@ def _base_env() -> dict[str, str]:
     env["PYTHONPATH"] = python_path
     env.setdefault("OMP_NUM_THREADS", "1")
     env.setdefault("MKL_NUM_THREADS", "1")
+    env["BACKEND"] = "gloo"
+    env["DEVICE"] = "cpu"
+    env.pop("DEVICE_ID", None)
     return env
+
+
+def test_examples_use_environment_for_device_selection() -> None:
+    maintained_roots = [
+        EXAMPLE_DIR,
+        REPO_ROOT / "docs/content/notebooks/1-Fundamentals",
+    ]
+    stale_python = (
+        "layout().backend()",
+        'config["distribute"].get("backend"',
+        "def select_device(",
+        "def init_dist(",
+        "start_dist(",
+        "close_dist(",
+    )
+
+    for root in maintained_roots:
+        for path in root.rglob("*.py"):
+            source = path.read_text(encoding="utf-8")
+            assert not any(pattern in source for pattern in stale_python), path
+        for path in root.rglob("*.yaml"):
+            config = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            assert "backend" not in config.get("distribute", {}), path
+        for path in root.rglob("*.ipynb"):
+            notebook = json.loads(path.read_text(encoding="utf-8"))
+            source = "\n".join(
+                "".join(cell.get("source", [])) for cell in notebook.get("cells", [])
+            )
+            stale_notebook = stale_python + (
+                "  backend: gloo",
+                "  backend: ucx",
+                "'backend': backend",
+            )
+            assert not any(pattern in source for pattern in stale_notebook), path
 
 
 def _write_yaml(tmp_path: Path, source_name: str | Path, updates: dict) -> Path:

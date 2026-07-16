@@ -25,10 +25,10 @@ def _get_free_port() -> int:
 @pytest.mark.parametrize(
     "yaml_name",
     [
-        "jupiter_crm_cpu.yaml",
-        "jupiter_crm_dry_cpu.yaml",
-        "jupiter_gcm_cpu.yaml",
-        "jupiter_gcm_dry_cpu.yaml",
+        "jupiter_crm_small.yaml",
+        "jupiter_crm_dry_small.yaml",
+        "jupiter_gcm_small.yaml",
+        "jupiter_gcm_dry_small.yaml",
     ],
 )
 def test_run_hydro_jupiter_cpu_examples(tmp_path: Path, yaml_name: str) -> None:
@@ -42,6 +42,9 @@ def test_run_hydro_jupiter_cpu_examples(tmp_path: Path, yaml_name: str) -> None:
     env["PYTHONPATH"] = python_path
     env.setdefault("OMP_NUM_THREADS", "1")
     env.setdefault("MKL_NUM_THREADS", "1")
+    env["BACKEND"] = "gloo"
+    env["DEVICE"] = "cpu"
+    env.pop("DEVICE_ID", None)
     if "gcm" in yaml_name:
         cmd = [
             sys.executable,

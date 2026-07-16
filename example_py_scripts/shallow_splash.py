@@ -1,47 +1,11 @@
 import argparse
-import os
 
 import numpy as np
 import torch
-import torch.distributed as dist
-import torch.distributed.distributed_c10d as dist_c10d
 import yaml
-import snapy
 from snapy import Mesh, MeshOptions
 from snapy import kIDN, kIV2, kIV3
 from snapy.coord import cs_ab_to_lonlat, get_cs_face_name
-
-
-def init_dist(backend: str) -> torch.device:
-    os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
-    os.environ.setdefault("MASTER_PORT", "29501")
-    os.environ.setdefault("RANK", "0")
-    os.environ.setdefault("WORLD_SIZE", "1")
-    os.environ.setdefault("LOCAL_RANK", os.environ["RANK"])
-
-    local_rank = int(os.environ["LOCAL_RANK"])
-    if backend == "gloo":
-        dist.init_process_group(backend="gloo", init_method="env://")
-        device = torch.device("cpu")
-    elif backend == "ucx":
-        try:
-            import commux
-        except ImportError as exc:
-            raise RuntimeError(
-                "UCX backend requires commux. Install commux or use backend='gloo'."
-            ) from exc
-        commux.register()
-        if torch.cuda.is_available():
-            torch.cuda.set_device(local_rank)
-            device = torch.device(f"cuda:{local_rank}")
-        else:
-            device = torch.device("cpu")
-        dist.init_process_group(backend="ucx", init_method="env://")
-    else:
-        raise ValueError("Unsupported backend")
-
-    snapy.distributed.set_process_group(dist_c10d._get_default_group())
-    return device
 
 
 def initialize_block(
@@ -86,9 +50,8 @@ def main() -> None:
     with open(args.input, "r", encoding="utf-8") as stream:
         config = yaml.safe_load(stream)
 
-    device = init_dist(config["distribute"].get("backend", "gloo"))
-
     options = MeshOptions.from_yaml(args.input, verbose=False)
+    device = torch.device(options.device_str())
     options.block().output_dir(args.output_dir)
 
     mesh = Mesh(options)
@@ -120,9 +83,6 @@ def main() -> None:
         mesh.make_outputs(block_vars, current_time)
 
     mesh.finalize(block_vars, current_time)
-
-    if dist.is_initialized():
-        dist.destroy_process_group()
 
 
 if __name__ == "__main__":

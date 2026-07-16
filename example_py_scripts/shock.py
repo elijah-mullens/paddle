@@ -4,16 +4,10 @@ import torch
 from snapy import MeshBlock, MeshBlockOptions, kIDN, kIPR, kIV1, kIV2, kIV3
 
 
-def select_device(options: MeshBlockOptions) -> torch.device:
-    if torch.cuda.is_available() and options.layout().backend() == "ucx":
-        return torch.device(options.device_str())
-    return torch.device("cpu")
-
-
 def run_with(infile: str) -> None:
     options = MeshBlockOptions.from_yaml(infile)
     block = MeshBlock(options)
-    device = select_device(options)
+    device = torch.device(options.device_str())
     block.to(device)
 
     coord = block.module("coord")

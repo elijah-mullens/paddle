@@ -4,7 +4,6 @@ geometry:
   cells: {nx1: 1, nx2: 256, nx3: 512, nghost: 3}
 
 distribute:
-  backend: gloo
   layout: slab
   nb2: 2
   nb3: 2

@@ -38,11 +38,7 @@ op.output_dir(output_directory)
 # initialize block
 block = MeshBlock(op)
 
-# use cuda if available
-if torch.cuda.is_available() and op.layout().backend() == "ucx":
-    device = torch.device(block.device())
-else:
-    device = torch.device("cpu")
+device = torch.device(op.device_str())
 block.to(device)
 
 # get handles to modules

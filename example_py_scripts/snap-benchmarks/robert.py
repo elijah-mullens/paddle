@@ -16,16 +16,10 @@ S = 100.0
 A = 50.0
 
 
-def select_device(options: MeshBlockOptions) -> torch.device:
-    if torch.cuda.is_available() and options.layout().backend() == "ucx":
-        return torch.device(options.device_str())
-    return torch.device("cpu")
-
-
 def run_with(infile: str, restart_file: str = "") -> None:
     options = MeshBlockOptions.from_yaml(infile)
     block = MeshBlock(options)
-    device = select_device(options)
+    device = torch.device(options.device_str())
     block.to(device)
 
     coord = block.module("coord")

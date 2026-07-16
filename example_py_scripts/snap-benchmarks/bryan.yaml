@@ -23,7 +23,6 @@ geometry:
   cells: {nx1: 200, nx2: 400, nx3: 1, nghost: 3}
 
 distribute:
-  backend: ucx
   layout: slab
 
 dynamics:

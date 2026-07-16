@@ -26,7 +26,6 @@ geometry:
     nghost: 3
 
 distribute:
-  backend: ucx
   layout: cubed-sphere
   nb2: 1
   nb3: 1

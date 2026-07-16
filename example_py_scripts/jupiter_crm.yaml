@@ -70,7 +70,6 @@ geometry:
     nghost: 3
 
 distribute:
-  backend: gloo
   layout: slab
   nb2: 2
   nb3: 2
