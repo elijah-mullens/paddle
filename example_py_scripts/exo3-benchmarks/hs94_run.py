@@ -6,140 +6,126 @@ cshsgy/ExoCubed examples/2023-Chen-exo3/hs94.{cpp,inp}.
 Dry primitive equations on the gnomonic-equiangle cubed sphere (snapy `ideal-gas`
 EOS, lmars, vertical-implicit), Coriolis via the `coriolis` forcing. The HS94
 forcing — Newtonian relaxation of T toward Teq(lat,sigma) and low-level Rayleigh
-friction — is not a built-in snapy module, so it is applied as an operator-split
-source on the conserved state each step (matching the ExoCubed `Forcing`).
+friction — is applied by a saved TorchScript module during each Runge-Kutta
+stage (matching the ExoCubed `Forcing`) without calling back into Python.
 IC: dry-adiabatic hydrostatic profile (theta=Ts up to z_iso, then isothermal),
 seeded with small random vertical velocity.
 """
 import argparse
 import os
+from typing import Dict
 
-import yaml
-import numpy as np
 import torch
 from snapy import Mesh, MeshOptions, kIDN, kIPR, kIV1, kIV2, kIV3
 from paddle import setup_profile
 
-FACE_NAMES = ["+X", "+Y", "-X", "+Z", "-Y", "-Z"]
-
 # --- HS94 + Earth dry-air parameters (from hs94.cpp / hs94.inp) ---
 # Rd/cp from the snapy "dry" species (M=29 g/mol, cv_R=2.5 -> gamma=1.4)
 G = 9.81
-RD = 8.31446 / 0.029
-CP = 3.5 * RD
-CV = CP - RD
-KAPPA = RD / CP
 P0 = 1.0e5
 TS = 315.0
-DT_h = 60.0
-DTHETA = 10.0
-SIGMAB = 0.7
-Z_ISO = 2.0e4
-RP = 6.371e6
 DAY = 86400.0
-KF = 1.0 / DAY
-KA = 0.025 / DAY
-KS = 0.25 / DAY
-TEQ_FLOOR = 200.0
 PERTURBATION_SEED = 0
 VERTICAL_VELOCITY_PERTURBATION = 1.0e-2
 
 
-def ab_to_lat(face, alpha, beta):
-    x = np.tan(alpha)
-    y = np.tan(beta)
-    r = np.sqrt(x * x + y * y + 1.0)
-    if face in ("+X", "+Y", "-X", "-Y"):
-        lat = np.arctan(y / np.sqrt(1 + x * x))
-    elif face == "+Z":
-        lat = np.arcsin(1.0 / r)
-    elif face == "-Z":
-        lat = -np.arcsin(1.0 / r)
-    else:
-        raise ValueError(face)
-    return lat
+class HS94Forcing(torch.nn.Module):
+    """Block-independent, scriptable HS94 forcing."""
+
+    def __init__(self):
+        super().__init__()
+        self.rd = 8.31446 / 0.029
+        self.cv = 2.5 * self.rd
+        self.kappa = 2.0 / 7.0
+        self.p0 = P0
+        self.ts = TS
+        self.dt_h = 60.0
+        self.dtheta = 10.0
+        self.sigmab = 0.7
+        self.kf = 1.0 / DAY
+        self.ka = 0.025 / DAY
+        self.ks = 0.25 / DAY
+        self.teq_floor = 200.0
+        self.idn = kIDN
+        self.ipr = kIPR
+        self.iv1 = kIV1
+        self.iv3 = kIV3
+
+    def forward(
+        self,
+        var: Dict[str, torch.Tensor],
+        dt: float,
+        stage: int,
+    ) -> Dict[str, torch.Tensor]:
+        """Return the additive conserved-state increment for one RK stage."""
+        hydro_w = var["hydro_w"]
+        latitude = var["coord.latitude"]
+
+        rho = hydro_w[self.idn]
+        pressure = hydro_w[self.ipr]
+        temperature = pressure / (rho * self.rd)
+        sigma = pressure / self.p0
+        coslat = torch.cos(latitude)
+        sinlat = torch.sin(latitude)
+        teq = (
+            self.ts
+            - self.dt_h * sinlat**2
+            - self.dtheta * torch.log(torch.clamp(sigma, min=1e-12)) * coslat**2
+        ) * sigma**self.kappa
+        teq = torch.clamp(teq, min=self.teq_floor)
+        sigma_p = torch.clamp((sigma - self.sigmab) / (1.0 - self.sigmab), min=0.0)
+        kv = sigma_p * self.kf
+        kt = self.ka + (self.ks - self.ka) * sigma_p * coslat**4
+
+        du = torch.zeros_like(hydro_w)
+
+        # Newtonian cooling on total energy (internal energy = rho*cv*T).
+        du[self.ipr] = -dt * rho * self.cv * kt * (temperature - teq)
+
+        # Low-level Rayleigh friction on covariant momentum.
+        du[self.iv1 : self.iv3 + 1] = (
+            -dt * kv * hydro_w[self.idn] * hydro_w[self.iv1 : self.iv3 + 1]
+        )
+        return {"hydro_du": du}
 
 
-def dry_adiabat_profile(z):
-    """T(z), p(z), rho(z): dry adiabat (theta=Ts) up to z_iso, isothermal above."""
-    z = np.asarray(z, dtype=np.float64)
-    T_iso = TS - G * Z_ISO / CP
-    p_iso = P0 * (T_iso / TS) ** (CP / RD)
-    T = np.where(z <= Z_ISO, TS - (G / CP) * z, T_iso)
-    p = np.where(
-        z <= Z_ISO,
-        P0 * (np.clip(TS - (G / CP) * z, 1.0, None) / TS) ** (CP / RD),
-        p_iso * np.exp(-G * (z - Z_ISO) / (RD * T_iso)),
+def save_forcing_module(path: str) -> None:
+    """Save the block-independent HS94 forcing as TorchScript."""
+    torch.jit.script(HS94Forcing().eval()).save(path)
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument(
+        "-c", "--config", default=os.path.join(os.path.dirname(__file__), "hs94.yaml")
     )
-    rho = p / (RD * T)
-    return T, p, rho
+    p.add_argument("--output-dir", default="out_hs94")
+    args = p.parse_args()
 
-
-def vertical_velocity_perturbation(template, face_id):
-    rng = np.random.default_rng(PERTURBATION_SEED + face_id)
-    perturbation = rng.uniform(
-        -VERTICAL_VELOCITY_PERTURBATION,
-        VERTICAL_VELOCITY_PERTURBATION,
-        size=tuple(template.shape),
-    )
-    return torch.as_tensor(perturbation, dtype=template.dtype, device=template.device)
-
-
-def hs_forcing(hw, hu, lat_col, dt):
-    """Operator-split HS94 source on conserved state hu (in place).
-    hw,hu: (5, nc3, nc2, nc1); lat_col: (nc3, nc2, 1) latitude broadcast over height."""
-    rho = hw[kIDN]
-    p = hw[kIPR]
-    T = p / (rho * RD)
-    sigma = p / P0
-    coslat = torch.cos(lat_col)
-    sinlat = torch.sin(lat_col)
-    Teq = (
-        TS
-        - DT_h * sinlat**2
-        - DTHETA * torch.log(torch.clamp(sigma, min=1e-12)) * coslat**2
-    ) * sigma**KAPPA
-    Teq = torch.clamp(Teq, min=TEQ_FLOOR)
-    sigma_p = torch.clamp((sigma - SIGMAB) / (1.0 - SIGMAB), min=0.0)
-    Kv = sigma_p * KF
-    Kt = KA + (KS - KA) * sigma_p * coslat**4
-    # Newtonian cooling on total energy (internal energy = rho*cv*T)
-    hu[kIPR] += -dt * rho * CV * Kt * (T - Teq)
-    # low-level Rayleigh friction on (covariant) momentum, implicit/stable
-    damp = 1.0 / (1.0 + dt * Kv)
-    hu[kIV1] *= damp
-    hu[kIV2] *= damp
-    hu[kIV3] *= damp
-
-
-def run(args):
-    with open(args.config) as f:
-        config = yaml.safe_load(f)
     opt = MeshOptions.from_yaml(args.config)
-    device = torch.device(opt.device_str())
     opt.block().output_dir(args.output_dir)
     mesh = Mesh(opt)
-    mesh.to(device)
+    mesh.to(torch.device(opt.device_str()))
+    os.makedirs(args.output_dir, exist_ok=True)
+    forcing_path = os.path.join(args.output_dir, "hs94_forcing.pt")
+    save_forcing_module(forcing_path)
+    mesh.set_user_stage_forcings([forcing_path])
 
-    lats = []  # per-block (nc3,nc2,1) latitude
     block_vars = []
     for block in mesh.blocks:
         layout = block.get_layout()
         _, _, face_id = layout.loc_of(layout.options.rank())
-        coord = block.module("coord")
-        x1v = coord.buffer("x1v").cpu().numpy()
-        x2v = coord.buffer("x2v").cpu().numpy()
-        x3v = coord.buffer("x3v").cpu().numpy()
-        alpha, beta = np.meshgrid(x2v, x3v)  # (nc3,nc2)
-        lat2d = ab_to_lat(FACE_NAMES[face_id], alpha, beta)  # (nc3,nc2)
-        lats.append(torch.from_numpy(lat2d[..., None]).to(device, torch.float64))
-        # dry-adiabatic hydrostatic IC (theta=Ts up to where T hits Tmin, then isothermal)
         w = setup_profile(
             block, {"Ts": TS, "Ps": P0, "grav": G, "Tmin": 120.0}, method="dry-adiabat"
         )
-        w[kIV1] = vertical_velocity_perturbation(w[kIV1], face_id)
-        w[kIV2] = 0.0
-        w[kIV3] = 0.0
+        generator = torch.Generator(device=w.device).manual_seed(
+            PERTURBATION_SEED + face_id
+        )
+        w[kIV1].uniform_(
+            -VERTICAL_VELOCITY_PERTURBATION,
+            VERTICAL_VELOCITY_PERTURBATION,
+            generator=generator,
+        )
         block_vars.append({"hydro_w": w})
     block_vars, current_time = mesh.initialize(block_vars)
 
@@ -153,10 +139,6 @@ def run(args):
         mesh.print_cycle_info(block_vars, current_time, dt)
         for stage in range(len(intg.stages)):
             mesh.forward(block_vars, dt, stage)
-        # HS94 Newtonian cooling + Rayleigh drag (operator split), then refresh prim
-        for bv, block, lat_col in zip(block_vars, mesh.blocks, lats):
-            hs_forcing(bv["hydro_w"], bv["hydro_u"], lat_col, dt)
-            bv["hydro_w"] = block.module("hydro.eos").compute("U->W", [bv["hydro_u"]])
         err = mesh.check_redo(block_vars)
         if err > 0:
             continue
@@ -168,9 +150,4 @@ def run(args):
 
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser()
-    p.add_argument(
-        "-c", "--config", default=os.path.join(os.path.dirname(__file__), "hs94.yaml")
-    )
-    p.add_argument("--output-dir", default="out_hs94")
-    run(p.parse_args())
+    main()
