@@ -55,7 +55,7 @@ DEVICE=cuda torchrun --nproc_per_node=2 hs94_run.py --output-dir out_hs94
   should remain bounded and smooth across panel boundaries.
 - **HS94** — relaxes to the classic Held–Suarez climate: midlatitude eddy-driven
   westerly jets and a realistic zonal-mean temperature structure. Typical run speed is:
-  1. 100 simulation day / wall clock hour with 2x NVIDIA RTX 4000 cards.
+  1. 86 SDPH (simulation day per wall clock hour) with 2x NVIDIA RTX 4000 cards.
 - **Hot Jupiter** — develops a strong prograde **equatorial superrotating jet**.
 
 ## Dependencies
