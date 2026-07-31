@@ -20,17 +20,17 @@ matching the corresponding ExoCubed `Forcing`.
 
 Each driver lets `snapy.Mesh` initialize communication using `BACKEND`, `DEVICE`,
 and `DEVICE_ID` from the environment. The `distribute` block defaults to
-`blocks_per_process: 6`, i.e. the six cube faces. Launch with `torchrun`:
+`blocks_per_process: 1`, i.e. using one core for each of the six cube faces. Launch with `torchrun`:
 
 ```bash
 # W92 shallow water (one process holding all 6 faces)
-torchrun --nproc_per_node=1 w92_swe.py --output-dir out_w92
+torchrun --nproc_per_node=6 w92_swe.py --output-dir out_w92
 
 # HS94 dry dynamical core
-torchrun --nproc_per_node=1 hs94_run.py --output-dir out_hs94
+torchrun --nproc_per_node=6 hs94_run.py --output-dir out_hs94
 
 # Hot Jupiter
-torchrun --nproc_per_node=1 hjupiter_run.py --output-dir out_hjupiter
+torchrun --nproc_per_node=6 hjupiter_run.py --output-dir out_hjupiter
 ```
 
 Pass `-c <config.yaml>` to override the default config (each driver defaults to
@@ -38,10 +38,13 @@ the YAML next to it). Adjust `distribute.blocks_per_process` and set `BACKEND`,
 `DEVICE`, `DEVICE_ID`, or `CUDA_VISIBLE_DEVICES` as needed for multi-GPU.
 
 The process count and `blocks_per_process` must describe the six cube faces:
-use one process with `blocks_per_process: 6` (the supplied configs), or six
-processes with `blocks_per_process: 1`. In the latter case, launch with
-`torchrun --nproc_per_node=6 ...`. The `ucx` backend requires `commux`; use
-`gloo` for a CPU-only run.
+use six processes with `blocks_per_process: 1` (the supplied configs), or two processes with `blocks_per_process: 3` (the typical dual-GPU config). In the latter case, launch with `torchrun --nproc_per_node=2 ...`.
+
+Use `DEVICE=cuda` as the environment variable to run on GPU, e.g.:
+
+``bash
+DEVICE=cuda torchrun --nproc_per_node=2 hs94_run.py --output-dir out_hs94
+```
 
 ## Expected results
 

@@ -39,6 +39,8 @@ KT = 1.5e5
 SIGMA_STRA = 0.12
 SPONGE_TAU = 1.0e4
 SPONGE_Z = 2.5e6
+PERTURBATION_SEED = 0
+VERTICAL_VELOCITY_PERTURBATION = 1.0e-2
 
 
 def ab_to_lonlat(face, alpha, beta):
@@ -67,6 +69,16 @@ def ab_to_lonlat(face, alpha, beta):
         raise ValueError(face)
     lon = np.where(lon < 0.0, lon + 2 * np.pi, lon)
     return lon, lat
+
+
+def vertical_velocity_perturbation(template, face_id):
+    rng = np.random.default_rng(PERTURBATION_SEED + face_id)
+    perturbation = rng.uniform(
+        -VERTICAL_VELOCITY_PERTURBATION,
+        VERTICAL_VELOCITY_PERTURBATION,
+        size=tuple(template.shape),
+    )
+    return torch.as_tensor(perturbation, dtype=template.dtype, device=template.device)
 
 
 def hj_forcing(hw, hu, coslat, coslon, z, dt):
@@ -130,7 +142,7 @@ def run(args):
             print(
                 f"calibrated Rd={RD:.1f} J/kg/K  cp={CP:.1f}  cv={CV:.1f}", flush=True
             )
-        w[kIV1] = 0.0
+        w[kIV1] = vertical_velocity_perturbation(w[kIV1], face_id)
         w[kIV2] = 0.0
         w[kIV3] = 0.0
         block_vars.append({"hydro_w": w})
