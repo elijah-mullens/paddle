@@ -39,7 +39,7 @@ the YAML next to it). Adjust `distribute.blocks_per_process` and set `BACKEND`,
 
 The process count and `blocks_per_process` must describe the six cube faces:
 use six processes with `blocks_per_process: 1` (the supplied configs), or one processes
-with `blocks_per_process: 6` (the single GPU config). In the latter case, you can simply 
+with `blocks_per_process: 6` (the single GPU config). In the latter case, you can simply
 launch with `python -u ...`. `-u` means streaming the result instead of caching
 
 Use `DEVICE=cuda` as the environment variable to run on GPU, e.g.:
