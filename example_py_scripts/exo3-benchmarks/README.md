@@ -80,7 +80,7 @@ DEVICE=cuda python -u hs94_run.py --output-dir out_hs94
   1. 4 SDPH using 6 Intel(R) Xeon(R) E-2236 CPU @ 3.40GHz
 - **Hot Jupiter** — develops a strong prograde **equatorial superrotating jet**.
   Typical run speed is:
-  1. 520 SDPH (simulation day per wall clock hour) using 1x NVIDIA RTX 5090 cards
+  1. 540 SDPH (simulation day per wall clock hour) using 1x NVIDIA RTX 5090 cards
   1. 150 SDPH using 2x NVIDIA RTX 4000 cards.
   1. 7 SDPH using 6 Intel(R) Xeon(R) E-2236 CPU @ 3.40GHz
 
