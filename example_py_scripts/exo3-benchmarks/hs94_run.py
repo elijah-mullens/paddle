@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """
-Held-Suarez 1994 dry dynamical-core benchmark in snapy, reproducing
-cshsgy/ExoCubed examples/2023-Chen-exo3/hs94.{cpp,inp}.
+Held-Suarez 1994 dry dynamical-core benchmark in snapy based on
+cshsgy/ExoCubed/examples/2023-Chen-exo3/hs94.{cpp,inp}.
 
 Dry primitive equations on the gnomonic-equiangle cubed sphere (snapy `ideal-gas`
-EOS, lmars, vertical-implicit), Coriolis via the `coriolis` forcing. The HS94
-forcing — Newtonian relaxation of T toward Teq(lat,sigma) and low-level Rayleigh
-friction — is applied by a saved TorchScript module during each Runge-Kutta
+EOS, lmars, vertical-implicit), Coriolis via the `coriolis` forcing.
+
+The HS94 forcings
+    (1) Newtonian relaxation of T toward Teq(lat,sigma)
+    (2) low-level Rayleigh friction
+
+are applied by a saved TorchScript module during each Runge-Kutta
 stage (matching the ExoCubed `Forcing`) without calling back into Python.
+
 IC: dry-adiabatic hydrostatic profile (theta=Ts up to z_iso, then isothermal),
 seeded with small random vertical velocity.
 """
@@ -89,11 +94,6 @@ class HS94Forcing(torch.nn.Module):
         return {"hydro_du": du}
 
 
-def save_forcing_module(path: str) -> None:
-    """Save the block-independent HS94 forcing as TorchScript."""
-    torch.jit.script(HS94Forcing().eval()).save(path)
-
-
 def main():
     p = argparse.ArgumentParser()
     p.add_argument(
@@ -106,9 +106,12 @@ def main():
     opt.block().output_dir(args.output_dir)
     mesh = Mesh(opt)
     mesh.to(torch.device(opt.device_str()))
+
     os.makedirs(args.output_dir, exist_ok=True)
+
+    # Save the HS94 forcing as TorchScript
     forcing_path = os.path.join(args.output_dir, "hs94_forcing.pt")
-    save_forcing_module(forcing_path)
+    torch.jit.script(HS94Forcing().eval()).save(forcing_path)
     mesh.set_user_stage_forcings([forcing_path])
 
     block_vars = []
@@ -127,8 +130,8 @@ def main():
             generator=generator,
         )
         block_vars.append({"hydro_w": w})
-    block_vars, current_time = mesh.initialize(block_vars)
 
+    block_vars, current_time = mesh.initialize(block_vars)
     intg = mesh.module("block0.intg")
     cycle = 0
     mesh.make_outputs(block_vars, current_time)
