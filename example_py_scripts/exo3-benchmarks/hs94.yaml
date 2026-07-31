@@ -29,7 +29,7 @@ distribute:
   layout: cubed-sphere
   nb2: 1
   nb3: 1
-  blocks_per_process: 6
+  blocks_per_process: 1
   verbose: false
 
 dynamics:
@@ -60,7 +60,7 @@ boundary-condition:
 
 integration:
   type: rk3
-  cfl: 0.9
+  cfl: 0.7
   implicit-scheme: 9
   nlim: -1
   tlim: 2.592e7

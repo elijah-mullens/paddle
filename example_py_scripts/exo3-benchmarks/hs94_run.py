@@ -9,7 +9,7 @@ forcing — Newtonian relaxation of T toward Teq(lat,sigma) and low-level Raylei
 friction — is not a built-in snapy module, so it is applied as an operator-split
 source on the conserved state each step (matching the ExoCubed `Forcing`).
 IC: dry-adiabatic hydrostatic profile (theta=Ts up to z_iso, then isothermal),
-seeded with small random horizontal velocity.
+seeded with small random vertical velocity.
 """
 import argparse
 import os
@@ -41,6 +41,8 @@ KF = 1.0 / DAY
 KA = 0.025 / DAY
 KS = 0.25 / DAY
 TEQ_FLOOR = 200.0
+PERTURBATION_SEED = 0
+VERTICAL_VELOCITY_PERTURBATION = 1.0e-2
 
 
 def ab_to_lat(face, alpha, beta):
@@ -71,6 +73,16 @@ def dry_adiabat_profile(z):
     )
     rho = p / (RD * T)
     return T, p, rho
+
+
+def vertical_velocity_perturbation(template, face_id):
+    rng = np.random.default_rng(PERTURBATION_SEED + face_id)
+    perturbation = rng.uniform(
+        -VERTICAL_VELOCITY_PERTURBATION,
+        VERTICAL_VELOCITY_PERTURBATION,
+        size=tuple(template.shape),
+    )
+    return torch.as_tensor(perturbation, dtype=template.dtype, device=template.device)
 
 
 def hs_forcing(hw, hu, lat_col, dt):
@@ -108,7 +120,6 @@ def run(args):
     opt.block().output_dir(args.output_dir)
     mesh = Mesh(opt)
     mesh.to(device)
-    rng = np.random.default_rng(0)
 
     lats = []  # per-block (nc3,nc2,1) latitude
     block_vars = []
@@ -126,10 +137,9 @@ def run(args):
         w = setup_profile(
             block, {"Ts": TS, "Ps": P0, "grav": G, "Tmin": 120.0}, method="dry-adiabat"
         )
-        w[kIV1] = 0.0
-        # start from rest: grid-scale white-noise seeding drives negative density at the
-        # cube corners; the cubed-sphere grid's zonal asymmetry seeds the baroclinic eddies.
-        _ = x1v  # (kept for reference; no explicit perturbation)
+        w[kIV1] = vertical_velocity_perturbation(w[kIV1], face_id)
+        w[kIV2] = 0.0
+        w[kIV3] = 0.0
         block_vars.append({"hydro_w": w})
     block_vars, current_time = mesh.initialize(block_vars)
 
