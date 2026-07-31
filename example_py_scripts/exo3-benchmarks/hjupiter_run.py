@@ -35,7 +35,7 @@ VERTICAL_VELOCITY_PERTURBATION = 1.0e-2
 
 
 class HotJupiterForcing(torch.nn.Module):
-    """Block-independent hot-Jupiter Newtonian and sponge forcing."""
+    """Hot-Jupiter Newtonian and sponge forcing."""
 
     def __init__(self, rd: float, cv: float):
         super().__init__()

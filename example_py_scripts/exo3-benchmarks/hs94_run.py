@@ -35,7 +35,7 @@ VERTICAL_VELOCITY_PERTURBATION = 1.0e-2
 
 
 class HS94Forcing(torch.nn.Module):
-    """Block-independent, scriptable HS94 forcing."""
+    """scriptable HS94 forcing."""
 
     def __init__(self):
         super().__init__()
