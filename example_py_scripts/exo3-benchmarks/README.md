@@ -38,12 +38,14 @@ the YAML next to it). Adjust `distribute.blocks_per_process` and set `BACKEND`,
 `DEVICE`, `DEVICE_ID`, or `CUDA_VISIBLE_DEVICES` as needed for multi-GPU.
 
 The process count and `blocks_per_process` must describe the six cube faces:
-use six processes with `blocks_per_process: 1` (the supplied configs), or two processes with `blocks_per_process: 3` (the typical dual-GPU config). In the latter case, launch with `torchrun --nproc_per_node=2 ...`.
+use six processes with `blocks_per_process: 1` (the supplied configs), or one processes
+with `blocks_per_process: 6` (the single GPU config). In the latter case, you can simply 
+launch with `python -u ...`. `-u` means streaming the result instead of caching
 
 Use `DEVICE=cuda` as the environment variable to run on GPU, e.g.:
 
-``bash
-DEVICE=cuda torchrun --nproc_per_node=2 hs94_run.py --output-dir out_hs94
+```bash
+DEVICE=cuda python -u hs94_run.py --output-dir out_hs94
 ```
 
 ## Expected results
@@ -55,12 +57,12 @@ DEVICE=cuda torchrun --nproc_per_node=2 hs94_run.py --output-dir out_hs94
   should remain bounded and smooth across panel boundaries.
 - **HS94** — relaxes to the classic Held–Suarez climate: midlatitude eddy-driven
   westerly jets and a realistic zonal-mean temperature structure. Typical run speed is:
-  1. 300 SDPH (simulation day per wall clock hour) using 2x NVIDIA RTX 5090 cards
+  1. 300 SDPH (simulation day per wall clock hour) using 1x NVIDIA RTX 5090 cards
   1. 86 SDPH using 2x NVIDIA RTX 4000 cards.
   1. 4 SDPH using 6 Intel(R) Xeon(R) E-2236 CPU @ 3.40GHz
 - **Hot Jupiter** — develops a strong prograde **equatorial superrotating jet**.
   Typical run speed is:
-  1. 520 SDPH (simulation day per wall clock hour) using 2x NVIDIA RTX 5090 cards
+  1. 520 SDPH (simulation day per wall clock hour) using 1x NVIDIA RTX 5090 cards
   1. 150 SDPH using 2x NVIDIA RTX 4000 cards.
   1. 7 SDPH using 6 Intel(R) Xeon(R) E-2236 CPU @ 3.40GHz
 
