@@ -9,12 +9,30 @@ YAML config.
 | case | driver | config | physics |
 |------|--------|--------|---------|
 | **W92** Williamson (1992) shallow-water test 6 (Rossby–Haurwitz wave) | `w92_swe.py` | `w92.yaml` | shallow-water EOS, `shallow-roe` Riemann, Coriolis |
-| **HS94** Held–Suarez (1994) dry dynamical-core benchmark | `hs94_run.py` | `hs94.yaml` | dry ideal-gas primitive equations, `lmars`, vertical-implicit, Coriolis + HS94 Newtonian-relaxation/Rayleigh forcing (operator-split) |
-| **Hot Jupiter** dry GCM (day–night forced) | `hjupiter_run.py` | `hjupiter.yaml` | dry primitive equations + Newtonian relaxation toward a substellar-hot equilibrium + top Rayleigh sponge |
+| **HS94** Held–Suarez (1994) dry dynamical-core benchmark | `hs94_run.py` | `hs94.yaml` | dry ideal-gas primitive equations, `lmars`, vertical-implicit, Coriolis + TorchScript HS94 Newtonian-relaxation/Rayleigh forcing |
+| **Hot Jupiter** dry GCM (day–night forced) | `hjupiter_run.py` | `hjupiter.yaml` | dry primitive equations + TorchScript Newtonian relaxation toward a substellar-hot equilibrium and top Rayleigh sponge |
 
-The HS94 and hot-Jupiter forcings are not built-in `snapy` modules; each driver
-applies them as an operator-split source on the conserved state every step,
-matching the corresponding ExoCubed `Forcing`.
+The HS94 and hot-Jupiter forcings are not built-in `snapy` modules. Each driver
+scripts one block-independent forcing, saves it under the output directory, and
+registers it with `mesh.set_user_stage_forcings([forcing_path])`. Their scripted
+`forward` methods have the required interface:
+
+```python
+def forward(
+    self,
+    variables: Dict[str, torch.Tensor],
+    dt: float,
+    stage: int,
+) -> Dict[str, torch.Tensor]:
+    ...
+```
+
+For each block, `variables` contains the evolving model state and the block's
+named buffers. HS94 reads `coord.latitude`; hot Jupiter additionally reads
+`coord.longitude` and `coord.x1v`. These tensors share their underlying storage.
+The saved module therefore contains no block geometry or `MeshBlock` reference.
+Snapy executes every module in the registered list sequentially at each stage in
+LibTorch without acquiring the Python GIL.
 
 ## Running
 
@@ -62,7 +80,7 @@ DEVICE=cuda python -u hs94_run.py --output-dir out_hs94
   1. 4 SDPH using 6 Intel(R) Xeon(R) E-2236 CPU @ 3.40GHz
 - **Hot Jupiter** — develops a strong prograde **equatorial superrotating jet**.
   Typical run speed is:
-  1. 520 SDPH (simulation day per wall clock hour) using 1x NVIDIA RTX 5090 cards
+  1. 540 SDPH (simulation day per wall clock hour) using 1x NVIDIA RTX 5090 cards
   1. 150 SDPH using 2x NVIDIA RTX 4000 cards.
   1. 7 SDPH using 6 Intel(R) Xeon(R) E-2236 CPU @ 3.40GHz
 
