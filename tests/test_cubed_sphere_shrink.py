@@ -88,6 +88,25 @@ def test_shrink_cubed_sphere_restart_stitches_six_faces(tmp_path: Path, n: int) 
         torch.testing.assert_close(tensors["last_time"], torch.tensor([12.5]))
 
 
+def test_load_entry_keeps_names_that_share_one_storage(tmp_path: Path) -> None:
+    # Snapy points fill_solid_hydro_u at hydro_u when nothing is solid. Both
+    # names have to come back, or the restart written from them is short a
+    # tensor that Snapy expects to find.
+    shared = torch.arange(6, dtype=torch.float64).reshape(1, 2, 3)
+    part = tmp_path / "source.block0.final.part"
+    _save_tensors(
+        {"hydro_u": shared, "hydro_w": torch.zeros_like(shared), "alias": shared},
+        part,
+    )
+    bundle = tmp_path / "source.restart"
+    _write_bundle(bundle, [part])
+
+    tensors = _load_entry(bundle, read_restart_bundle_index(bundle)[0])
+
+    assert set(tensors) == {"hydro_u", "hydro_w", "alias"}
+    torch.testing.assert_close(tensors["alias"], tensors["hydro_u"])
+
+
 def test_shrink_refuses_to_overwrite_existing_output(tmp_path: Path) -> None:
     source = tmp_path / "source.restart"
     output = tmp_path / "shrunk.restart"
