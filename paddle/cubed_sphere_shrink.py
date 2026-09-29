@@ -151,14 +151,22 @@ def _load_entry(
                 remaining -= len(chunk)
         part.flush()
         module = torch.jit.load(part.name, map_location="cpu")
+        # Snapy aliases names such as fill_solid_hydro_u onto hydro_u, so two
+        # names share one storage. named_buffers and named_parameters drop all
+        # but the first of those unless remove_duplicate is off, which silently
+        # loses a tensor the restart has to carry.
         tensors = {
             name: tensor.detach().cpu().contiguous()
-            for name, tensor in module.named_buffers(recurse=True)
+            for name, tensor in module.named_buffers(
+                recurse=True, remove_duplicate=False
+            )
         }
         tensors.update(
             {
                 name: tensor.detach().cpu().contiguous()
-                for name, tensor in module.named_parameters(recurse=True)
+                for name, tensor in module.named_parameters(
+                    recurse=True, remove_duplicate=False
+                )
             }
         )
     return tensors
