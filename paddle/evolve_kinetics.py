@@ -44,10 +44,14 @@ def evolve_kinetics(
     conc_kinet = conc[:, :, :, 1:]  # exclude dry species
 
     # compute rate and rate jacobians
-    rate, rc_ddC, rc_ddT = kinet.forward_nogil(temp, pres, conc_kinet)
+    # compute rates and rate constants; jacobian needs kf when an evaporating
+    # solid has zero abundance (kintera >= #145)
+    rate, rc_ddC, rc_ddT, kf = kinet.forward_with_rate_constants(temp, pres, conc_kinet)
 
     # compute reaction jacobian
-    jac = kinet.jacobian(temp, conc_kinet, cp_vol, rate, rc_ddC, rc_ddT)
+    jac = kinet.jacobian(
+        temp, conc_kinet, cp_vol, rate, rc_ddC, rc_ddT, rate_constants=kf
+    )
 
     # compute concentration change
     stoich = kinet.buffer("stoich")
