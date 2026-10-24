@@ -5,13 +5,13 @@ from pathlib import Path
 import pytest
 import torch
 
-from paddle.cubed_sphere_shrink import (
+from paddle.cubed_sphere.cubed_sphere_shrink import (
     _load_entry,
     _save_tensors,
     shrink_cubed_sphere_restart,
     read_restart_bundle_index,
 )
-from paddle.cubed_sphere_expand import expand_cubed_sphere_restart
+from paddle.cubed_sphere.cubed_sphere_expand import expand_cubed_sphere_restart
 from test_cubed_sphere_shrink import _write_bundle
 
 

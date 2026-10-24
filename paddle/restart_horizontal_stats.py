@@ -8,7 +8,7 @@ from typing import Sequence
 
 import torch
 
-from .cubed_sphere_shrink import (
+from .cubed_sphere.cubed_sphere_shrink import (
     _entries_by_rank,
     _load_entry,
     _publish_bundle,

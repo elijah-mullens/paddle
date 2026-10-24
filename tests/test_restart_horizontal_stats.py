@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from paddle.cubed_sphere_shrink import (
+from paddle.cubed_sphere.cubed_sphere_shrink import (
     _load_entry,
     _save_tensors,
     _write_bundle,

@@ -11,7 +11,7 @@ from scipy import sparse
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from paddle import __main__ as paddle_main
-from paddle.cubed_sphere_remap import (
+from paddle.cubed_sphere.cubed_sphere_remap import (
     _CS_L2G_VEL,
     _map_cache_path,
     _run_command,
@@ -213,7 +213,7 @@ def test_generate_tempest_map_builds_expected_commands(
         if "--out_map" in cmd:
             Path(cmd[cmd.index("--out_map") + 1]).touch()
 
-    monkeypatch.setattr("paddle.cubed_sphere_remap._run_command", fake_run)
+    monkeypatch.setattr("paddle.cubed_sphere.cubed_sphere_remap._run_command", fake_run)
     paths = type(
         "TempestPathsLike",
         (),
@@ -255,7 +255,9 @@ def test_run_command_executes_subprocess_once(monkeypatch) -> None:
     def fake_run(cmd, cwd=None, check=True):
         calls.append((cmd, cwd, check))
 
-    monkeypatch.setattr("paddle.cubed_sphere_remap.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "paddle.cubed_sphere.cubed_sphere_remap.subprocess.run", fake_run
+    )
     _run_command(["GenerateCSMesh", "--help"])
     assert calls == [(["GenerateCSMesh", "--help"], None, True)]
 

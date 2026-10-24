@@ -5,19 +5,19 @@ from typing import Sequence
 
 
 def cubed_sphere_shrink_main(argv: Sequence[str] | None = None) -> int:
-    from .cubed_sphere_shrink import main
+    from .cubed_sphere.cubed_sphere_shrink import main
 
     return main(argv)
 
 
 def cubed_sphere_expand_main(argv: Sequence[str] | None = None) -> int:
-    from .cubed_sphere_expand import main
+    from .cubed_sphere.cubed_sphere_expand import main
 
     return main(argv)
 
 
 def cubed_sphere_remap_main(argv: Sequence[str] | None = None) -> int:
-    from .cubed_sphere_remap import main
+    from .cubed_sphere.cubed_sphere_remap import main
 
     return main(argv)
 
