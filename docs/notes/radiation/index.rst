@@ -138,6 +138,30 @@ radiation remains active on both day and night sides.
 Bottom albedo is distinct from an atmospheric particle's single-scattering
 albedo. It is applied to every band, including the thermal band.
 
+Cartesian illumination
+-----------------------
+
+``RTStateCartesian`` uses the same orbital models and band configuration,
+but evaluates each model at one longitude and latitude for the entire
+Cartesian domain. Both coordinates are in radians. Give every block the
+same coordinates so illumination is independent of domain decomposition:
+
+.. code-block:: python
+
+   from paddle.orbital import Uranus
+   from paddle.rt.rt_state_cartesian import RTStateCartesian
+
+   state = RTStateCartesian([Uranus()], block, config_path, lon=0.0, lat=0.3)
+   state.update_heating(variables, current_time)
+
+The scalar orbital calculation runs on CPU. Its zenith cosine and actual
+per-band beam are transferred to the grid device and broadcast over all
+horizontal columns, including ghosts, without copying each column value.
+The illumination changes with time, but is spatially uniform. Albedos,
+night-side handling, and the heating update schedule follow the cubed-sphere
+implementation. Atmospheric columns can still have different opacities and
+heating rates.
+
 Flux divergence and energy conservation
 ---------------------------------------
 
