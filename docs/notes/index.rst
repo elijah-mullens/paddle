@@ -10,6 +10,7 @@ included figures. Future notes can be added to this contents list.
    :maxdepth: 2
 
    orbital/index
+   opacity/index
 
 Build the collection with Sphinx installed, from the repository root:
 

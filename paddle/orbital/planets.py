@@ -24,7 +24,6 @@ class _J2000Planet(OrbitalForcing):
 
     def __init__(
         self,
-        energy_index: int = 4,
         hydro_u_key: str = "hydro_u",
         rt_heating_key: str = "rt_heating",
     ) -> None:
@@ -81,7 +80,6 @@ class _J2000Planet(OrbitalForcing):
             orbital_period=360.0 / anomaly_rate * 36525.0 * DAY,
             mean_anomaly=math.radians(longitude - perihelion),
             prime_meridian=math.radians(w0),
-            energy_index=energy_index,
             hydro_u_key=hydro_u_key,
             rt_heating_key=rt_heating_key,
         )

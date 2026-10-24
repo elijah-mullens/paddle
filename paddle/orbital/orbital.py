@@ -1,6 +1,7 @@
-from typing import Tuple
 import math
 import torch
+from typing import Tuple
+from snapy import kIPR
 
 
 class OrbitalForcing(torch.nn.Module):
@@ -16,7 +17,6 @@ class OrbitalForcing(torch.nn.Module):
         orbital_period: float,
         mean_anomaly: float = 0.0,
         prime_meridian: float = 0.0,
-        energy_index: int = 4,
         hydro_u_key: str = "hydro_u",
         rt_heating_key: str = "rt_heating",
     ) -> None:
@@ -33,7 +33,6 @@ class OrbitalForcing(torch.nn.Module):
         self.orbital_period = float(orbital_period)
         self.mean_anomaly = float(mean_anomaly)
         self.prime_meridian = float(prime_meridian)
-        self.energy_index = int(energy_index)
         self.hydro_u_key = str(hydro_u_key)
         self.rt_heating_key = str(rt_heating_key)
         # CPU constants mapping (cos f, sin f) to the stellar direction.
@@ -43,6 +42,8 @@ class OrbitalForcing(torch.nn.Module):
             (0.0, math.cos(obliquity)),
             (0.0, math.sin(obliquity)),
         )
+        # torchscript needs this to compile
+        self.energy_index = int(kIPR)
 
     def forward(
         self,

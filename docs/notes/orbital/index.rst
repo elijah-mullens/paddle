@@ -129,9 +129,7 @@ equinox by convention. The preset basis replaces this idealized alignment.
 The basis stays on CPU when ``module.to(device)`` is called. Like the scalar
 orbital parameters, it is constructor configuration and is not included in
 ``state_dict``. Reconstruct the same preset/configuration when restoring a
-model. Earlier versions of this note used batched time tensors and a registered
-basis buffer; callers of those versions must loop over times and reconstruct
-the preset rather than loading the old ``solar_basis`` state entry.
+model.
 
 Uranus uses the IAU north pole and negative :math:`\dot W`. Its ``obliquity``
 attribute is the angle between the **angular momentum** and orbital normal,
@@ -170,8 +168,12 @@ heat flux are outside this module.
    (\Delta U)_j=\begin{cases}q_{\rm rad}\,\Delta t,&j=j_E,\\
                             0,&j\ne j_E.\end{cases}
 
-The default energy index is 4 on the leading variable axis, with keys
-``hydro_u`` and ``rt_heating``. For an energy density in J/m³ the heating
+The energy index :math:`j_E` is taken from ``snapy.kIPR`` on the leading
+variable axis. The constructor stores it as ``self.energy_index`` so that
+TorchScript can compile the update. The base class and planet presets use
+this Snapy index rather than accepting an index argument. The variable keys
+default to ``hydro_u`` and ``rt_heating`` and can be set in the constructor.
+For an energy density in J/m³ the heating
 must be W/m³; temperature tendencies must first be converted consistently
 with the atmospheric model. The method returns an increment dictionary,
 without mutating the input state. ``stage`` is accepted but unused: the
