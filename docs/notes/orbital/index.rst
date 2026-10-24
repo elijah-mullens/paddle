@@ -7,7 +7,7 @@ Scope and interface
 The first step is the radiation arriving at the top of the atmosphere.
 ``paddle/orbital/orbital.py`` implements ``OrbitalForcing``, a PyTorch module
 that supplies this illumination geometry. Its small stage-forcing method also
-applies the heating calculated later in :doc:`../radiation/rt_state`.
+applies the heating calculated later in :doc:`../radiation/index`.
 ``paddle/orbital/planets.py`` provides ``Earth``, ``Jupiter``, ``Saturn``,
 ``Uranus``, and ``Neptune`` subclasses. These are fixed elliptical orbits
 for atmospheric experiments, with spherical surfaces and constant spin.

@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from cubed_sphere_utils import (
+from .cubed_sphere_utils import (
     make_poly_patch,
     draw_single_panel,
     draw_panel_seam,

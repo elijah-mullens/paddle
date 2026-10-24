@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("--html", type=Path, required=True)
 parser.add_argument(
-    "--output", type=Path, default=Path(__file__).with_name("radiation.pdf")
+    "--output", type=Path, default=Path(__file__).with_name("paddle_notes.pdf")
 )
 args = parser.parse_args()
 source = args.html.resolve()
@@ -91,7 +91,7 @@ figcaption {font-size:9pt;text-align:left;margin-top:10pt;}
 .citation {font-size:8.5pt;}
 """
 html = (
-    '<html><head><meta charset="utf-8"><title>Orbital illumination, opacity, and atmospheric heating</title><style>'
+    '<html><head><meta charset="utf-8"><title>Paddle technical notes</title><style>'
     + css
     + "</style></head><body>"
     + ET.tostring(body, encoding="unicode", method="html")

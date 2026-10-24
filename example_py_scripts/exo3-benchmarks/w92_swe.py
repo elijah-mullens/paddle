@@ -19,7 +19,7 @@ import torch
 from snapy import Mesh, MeshOptions
 
 # paddle velocity rotation (contravariant -> global Cartesian)
-from paddle import cubed_sphere_remap as csr
+from paddle.cubed_sphere import cubed_sphere_remap as csr
 
 FACE_NAMES = [
     "+X",

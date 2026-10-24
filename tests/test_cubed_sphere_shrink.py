@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from paddle.cubed_sphere_shrink import (
+from paddle.cubed_sphere.cubed_sphere_shrink import (
     RESTART_BUNDLE_MAGIC,
     _shrink_spatial_tensor,
     _load_entry,
@@ -14,7 +14,7 @@ from paddle.cubed_sphere_shrink import (
     shrink_cubed_sphere_restart,
     read_restart_bundle_index,
 )
-from paddle.cubed_sphere_expand import _expand_spatial_tensor
+from paddle.cubed_sphere.cubed_sphere_expand import _expand_spatial_tensor
 
 
 def _write_bundle(path: Path, parts: list[Path]) -> None:

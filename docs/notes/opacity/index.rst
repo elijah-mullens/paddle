@@ -215,7 +215,7 @@ extinctions are :math:`\beta_g,\beta_c` and the cloud properties are
 when cloud scattering is nonzero. Use zero for undefined ratios, as above.
 PyHarp's ``RadiationBand`` performs this weighted combination for the
 opacities listed in each band. The :doc:`radiation-state section
-<../radiation/rt_state>` connects these band definitions to the atmospheric
+<../radiation/index>` connects these band definitions to the atmospheric
 state and completes the calculation of heating.
 
 Examples and reproducible figures

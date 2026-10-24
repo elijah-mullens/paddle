@@ -222,6 +222,9 @@ docker-compose.override.yaml
 # pt file
 *.pt
 
+# pdf file
+*.pdf
+
 # agents
 AGENTS.md
 CLAUDE.md

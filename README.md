@@ -291,3 +291,23 @@ Here is a simple recipe:
     ```
     sudo systemctl restart containerd
     ```
+
+### Cubed-sphere Python API
+
+Restart and remapping functions are grouped under `paddle.cubed_sphere`:
+
+```python
+from paddle.cubed_sphere import (
+    shrink_cubed_sphere_restart,
+    expand_cubed_sphere_restart,
+    remap_cubed_sphere_files,
+)
+from paddle.cubed_sphere.cubed_sphere_utils import draw_panel_seam
+```
+
+The `paddle cs-shrink`, `paddle cs-expand`, and `paddle cs-remap` commands
+keep their names. Reinstall the package after updating to refresh the
+`paddle-cs-*` console entry points. Geometry plotting requires Matplotlib.
+The equations, layouts, and examples are in
+[the cubed-sphere technical note](docs/notes/cubed_sphere/index.rst), included
+in [Paddle notes](docs/notes/paddle_notes.pdf).

@@ -86,7 +86,7 @@ DEVICE=cuda python -u hs94_run.py --output-dir out_hs94
 
 ## Dependencies
 
-`snapy`, `paddle` (distributed/profile helpers and `paddle.cubed_sphere_remap`
+`snapy`, `paddle` (distributed/profile helpers and `paddle.cubed_sphere.cubed_sphere_remap`
 for the W92 contravariant↔geographic velocity rotation), `torch`, `numpy`,
 `pyyaml`.
 
