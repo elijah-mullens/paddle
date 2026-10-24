@@ -87,7 +87,12 @@ class _J2000Planet(OrbitalForcing):
         )
 
         # Sun direction is opposite to the heliocentric planet direction.
-        self.solar_basis = -torch.stack((origin, transverse, pole)) @ pq
+        basis = -torch.stack((origin, transverse, pole)) @ pq
+        self.solar_basis = (
+            (float(basis[0, 0]), float(basis[0, 1])),
+            (float(basis[1, 0]), float(basis[1, 1])),
+            (float(basis[2, 0]), float(basis[2, 1])),
+        )
 
 
 class Earth(_J2000Planet):

@@ -26,7 +26,10 @@ def generate(output_dir: Path) -> None:
     for planet_type, panel in zip((Earth, Jupiter, Saturn, Uranus, Neptune), panels):
         planet = planet_type()
         t = phase * planet.orbital_period
-        _, _, r, _, dec = planet.insolation(torch.zeros_like(t), torch.zeros_like(t), t)
+        zero = torch.tensor(0.0, dtype=torch.float64)
+        samples = [planet.insolation(zero, zero, float(time)) for time in t]
+        r = torch.tensor([sample[2] for sample in samples], dtype=torch.float64)
+        dec = torch.stack([sample[4] for sample in samples])
         flux = planet.stellar_luminosity / (4 * np.pi * r.square())
         reference = planet.stellar_luminosity / (4 * np.pi * planet.semi_major_axis**2)
         label = planet_type.__name__

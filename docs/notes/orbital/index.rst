@@ -13,11 +13,15 @@ They do not calculate atmospheric absorption or solve radiative transfer.
 
 All dimensional constructor arguments use SI: luminosity in W, semi-major
 axis in m, period and time in s, and rotation rate in rad/s. Angles are radians.
-Surface longitude is east-positive and latitude is planetocentric. Inputs
-are floating PyTorch tensors on a common device with broadcastable shapes.
-For a time series over a grid, use shapes ``(nt, 1, 1)``, ``(1, nlat, 1)``,
-and ``(1, 1, nlon)`` for time, latitude, and longitude respectively.
-Use float64 to resolve rotation phase over years, especially for outer planets.
+Surface longitude is east-positive and latitude is planetocentric. Longitude
+and latitude are floating PyTorch tensors with broadcastable shapes on the
+same device. Time is a single Python float in seconds. For a time series,
+call ``insolation`` once per time, as the figure-generation script does.
+
+Kepler iterations, substellar coordinates, and inverse-square irradiance use
+Python scalar math on the CPU. Only the substellar coordinates are converted
+to tensors on the grid device; grid-sized incidence and masking run there.
+This follows the atmospheric time-stepping interface: one time, many columns.
 
 ``insolation(lon, lat, time)`` returns:
 
@@ -27,8 +31,10 @@ Use float64 to resolve rotation phase over years, especially for outer planets.
 * ``substellar_lon``: east longitude in the interval [-pi, pi);
 * ``substellar_lat``: planetocentric latitude in [-pi/2, pi/2].
 
-The first two outputs have the broadcast spatial/time shape. The final three
-have the input time shape. Horizontal incident flux is ``mu0 * beam``.
+The first two outputs have the broadcast spatial shape. Distance is a Python
+float. Substellar longitude and latitude are scalar tensors matching their
+respective grid coordinates in dtype and device. Horizontal incident flux is
+``mu0 * beam``.
 
 Kepler's equation
 -----------------
@@ -50,7 +56,7 @@ The implementation wraps :math:`M` to :math:`[-\pi,\pi)` and solves for
 The initial guess is :math:`E_0=M` for :math:`e\le0.8`, otherwise
 :math:`E_0=\operatorname{sign}(M)\pi` (positive at zero). The high-eccentricity
 start avoids the poor Newton steps near periapsis that occur with :math:`E_0=M`.
-The fixed iteration count supports TorchScript and tensor batches; it is not
+The fixed iteration count supports TorchScript; it is not
 an adaptive error estimate. Extremely near-parabolic cases require separate
 accuracy assessment. For the supplied planets :math:`e<0.054`.
 
@@ -101,7 +107,7 @@ define a fixed planet-equatorial basis
    \mathbf u=(-\sin\alpha_p,\cos\alpha_p,0),\qquad
    \mathbf v=\mathbf k\times\mathbf u.
 
-The registered ``solar_basis`` buffer contains the two columns of
+The ``solar_basis`` tuple of CPU float constants contains the two columns of
 :math:`-[\mathbf u\ \mathbf v\ \mathbf k]^T[\mathbf P\ \mathbf Q]`.
 Multiplication by :math:`(\cos f,\sin f)^T` gives :math:`(s_x,s_y,s_z)`.
 With prime-meridian angle :math:`W(t)=W_0+\dot Wt`,
@@ -120,9 +126,12 @@ For a generic ``OrbitalForcing`` without a planet preset, the default basis
 instead gives :math:`(s_x,s_y,s_z)=(\cos f,\cos\varepsilon\sin f,
 \sin\varepsilon\sin f)`. Thus periapsis coincides with the northern spring
 equinox by convention. The preset basis replaces this idealized alignment.
-The buffer moves with ``module.to(device)`` and is included in ``state_dict``;
-reconstruct the same preset/configuration before loading a state dictionary,
-since scalar orbital attributes are constructor configuration, not buffers.
+The basis stays on CPU when ``module.to(device)`` is called. Like the scalar
+orbital parameters, it is constructor configuration and is not included in
+``state_dict``. Reconstruct the same preset/configuration when restoring a
+model. Earlier versions of this note used batched time tensors and a registered
+basis buffer; callers of those versions must loop over times and reconstruct
+the preset rather than loading the old ``solar_basis`` state entry.
 
 Uranus uses the IAU north pole and negative :math:`\dot W`. Its ``obliquity``
 attribute is the angle between the **angular momentum** and orbital normal,
@@ -226,14 +235,14 @@ Examples and reproducible figures
 
    for planet_type in (Earth, Jupiter, Saturn, Uranus, Neptune):
        planet = planet_type()
-       t = torch.tensor(0.0, dtype=torch.float64)  # J2000
-       mu0, beam, r, lon_star, lat_star = planet.insolation(t, t, t)
-       print(planet_type.__name__, r.item(), lat_star.rad2deg().item())
+       zero = torch.tensor(0.0, dtype=torch.float64)
+       mu0, beam, r, lon_star, lat_star = planet.insolation(zero, zero, 0.0)
+       print(planet_type.__name__, r, lat_star.rad2deg().item())
 
    earth = Earth()
    lon = torch.linspace(-torch.pi, torch.pi, 361, dtype=torch.float64)[None, :]
    lat = torch.linspace(-torch.pi/2, torch.pi/2, 181, dtype=torch.float64)[:, None]
-   mu0, beam, *_ = earth.insolation(lon, lat, torch.tensor(0., dtype=torch.float64))
+   mu0, beam, *_ = earth.insolation(lon, lat, 0.0)
    horizontal_flux = mu0 * beam
 
 .. figure:: figures/orbital_cycles.png

@@ -4,13 +4,7 @@ import torch
 
 
 class OrbitalForcing(torch.nn.Module):
-    """Fixed Kepler orbit illumination and an explicit radiative increment.
-
-    Use SI units and radians. Longitudes are east-positive, latitudes are
-    planetocentric, and time is seconds from the chosen epoch. The generic
-    orbit has its northern spring equinox at periapsis; planet presets supply
-    a J2000 orientation instead. See docs/notes/orbital/index.rst.
-    """
+    """Keplerian illumination and radiative forcing, using SI units and radians."""
 
     def __init__(
         self,
@@ -27,22 +21,10 @@ class OrbitalForcing(torch.nn.Module):
         rt_heating_key: str = "rt_heating",
     ) -> None:
         super().__init__()
-        values = (
-            stellar_luminosity,
-            semi_major_axis,
-            eccentricity,
-            obliquity,
-            rotation_rate,
-            orbital_period,
-            mean_anomaly,
-            prime_meridian,
-        )
-        if not all(math.isfinite(v) for v in values):
-            raise ValueError("Orbital parameters must be finite")
-        if semi_major_axis <= 0 or orbital_period <= 0 or stellar_luminosity < 0:
-            raise ValueError("Axis and period must be positive; luminosity nonnegative")
-        if not 0 <= eccentricity < 1:
-            raise ValueError("A bound elliptical orbit requires 0 <= eccentricity < 1")
+        if not 0 <= eccentricity < 1 or semi_major_axis <= 0 or orbital_period <= 0:
+            raise ValueError(
+                "Require 0 <= eccentricity < 1 and positive axis and period"
+            )
         self.stellar_luminosity = float(stellar_luminosity)
         self.semi_major_axis = float(semi_major_axis)
         self.eccentricity = float(eccentricity)
@@ -54,18 +36,12 @@ class OrbitalForcing(torch.nn.Module):
         self.energy_index = int(energy_index)
         self.hydro_u_key = str(hydro_u_key)
         self.rt_heating_key = str(rt_heating_key)
-        # Columns map (cos f, sin f) to the stellar direction in a
-        # nonrotating planet-equatorial frame. Presets replace this matrix.
-        self.register_buffer(
-            "solar_basis",
-            torch.tensor(
-                [
-                    [1.0, 0.0],
-                    [0.0, math.cos(obliquity)],
-                    [0.0, math.sin(obliquity)],
-                ],
-                dtype=torch.float64,
-            ),
+        # CPU constants mapping (cos f, sin f) to the stellar direction.
+        # Planet presets replace this idealized equinox-at-periapsis basis.
+        self.solar_basis = (
+            (1.0, 0.0),
+            (0.0, math.cos(obliquity)),
+            (0.0, math.sin(obliquity)),
         )
 
     def forward(
@@ -74,11 +50,7 @@ class OrbitalForcing(torch.nn.Module):
         dt: float,
         stage: int,
     ) -> dict[str, torch.Tensor]:
-        """Return an increment; heating is energy/volume/time, not K/s.
-
-        ``stage`` is accepted for integrator compatibility but unused. The
-        caller owns stage weights and must pass the appropriate ``dt``.
-        """
+        # Heating is energy per volume per time; the caller owns stage weights.
         hydro_du = torch.zeros_like(variables[self.hydro_u_key])
         hydro_du[self.energy_index] = variables[self.rt_heating_key] * dt
         return {self.hydro_u_key: hydro_du}
@@ -88,71 +60,58 @@ class OrbitalForcing(torch.nn.Module):
         self,
         lon: torch.Tensor,
         lat: torch.Tensor,
-        time: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Return (mu0, beam, distance, substellar_lon, substellar_lat).
+        time: float,
+    ) -> Tuple[torch.Tensor, torch.Tensor, float, torch.Tensor, torch.Tensor]:
+        """Return mu0, beam, distance, substellar longitude and latitude.
 
-        Floating tensors must share a device and have broadcastable shapes.
-        Use time[:, None, None] with a spatial grid for a time series.
-        Beam is dayside normal irradiance (W/m²); horizontal flux is mu0*beam.
-        Geometry outputs retain the time shape. Prefer float64 for long runs.
+        Time is one elapsed time in seconds (from J2000 for planet presets).
+        Orbit math uses CPU scalars; lon/lat are east-positive, planetocentric
+        grids on the same device. Beam is normal irradiance in W/m².
         """
-        mean_anomaly = (
-            torch.remainder(
-                self.mean_anomaly
-                + 2.0 * math.pi * time / self.orbital_period
-                + math.pi,
-                2.0 * math.pi,
-            )
-            - math.pi
-        )
-        eccentric_anomaly = mean_anomaly.clone()
+        time = float(time)
+        mean_anomaly = self.mean_anomaly + 2.0 * math.pi * time / self.orbital_period
+        mean_anomaly = (mean_anomaly + math.pi) % (2.0 * math.pi) - math.pi
+        eccentric_anomaly = mean_anomaly
         if self.eccentricity > 0.8:
-            eccentric_anomaly = torch.where(
-                mean_anomaly >= 0,
-                torch.full_like(mean_anomaly, math.pi),
-                torch.full_like(mean_anomaly, -math.pi),
-            )
+            eccentric_anomaly = math.pi if mean_anomaly >= 0.0 else -math.pi
 
         # calculate distance
         for _ in range(32):
-            eccentric_anomaly = eccentric_anomaly - (
+            eccentric_anomaly -= (
                 eccentric_anomaly
-                - self.eccentricity * eccentric_anomaly.sin()
+                - self.eccentricity * math.sin(eccentric_anomaly)
                 - mean_anomaly
-            ) / (1.0 - self.eccentricity * eccentric_anomaly.cos())
+            ) / (1.0 - self.eccentricity * math.cos(eccentric_anomaly))
         distance = self.semi_major_axis * (
-            1.0 - self.eccentricity * eccentric_anomaly.cos()
+            1.0 - self.eccentricity * math.cos(eccentric_anomaly)
         )
 
-        # calculate substellar latitude
-        true_anomaly = 2.0 * torch.atan2(
-            math.sqrt(1.0 + self.eccentricity) * (0.5 * eccentric_anomaly).sin(),
-            math.sqrt(1.0 - self.eccentricity) * (0.5 * eccentric_anomaly).cos(),
+        # calculate stellar latitude
+        true_anomaly = 2.0 * math.atan2(
+            math.sqrt(1.0 + self.eccentricity) * math.sin(0.5 * eccentric_anomaly),
+            math.sqrt(1.0 - self.eccentricity) * math.cos(0.5 * eccentric_anomaly),
         )
-        basis = self.solar_basis.to(time)
-        cf, sf = true_anomaly.cos(), true_anomaly.sin()
-        sx = basis[0, 0] * cf + basis[0, 1] * sf
-        sy = basis[1, 0] * cf + basis[1, 1] * sf
-        sz = basis[2, 0] * cf + basis[2, 1] * sf
-        substellar_lat = sz.clamp(-1.0, 1.0).asin()
+        cf, sf = math.cos(true_anomaly), math.sin(true_anomaly)
+        sx = self.solar_basis[0][0] * cf + self.solar_basis[0][1] * sf
+        sy = self.solar_basis[1][0] * cf + self.solar_basis[1][1] * sf
+        sz = self.solar_basis[2][0] * cf + self.solar_basis[2][1] * sf
+        stellar_lat = math.asin(max(-1.0, min(1.0, sz)))
 
-        # calculate substellar longitude
-        stellar_right_ascension = torch.atan2(sy, sx)
-        spin_angle = torch.remainder(
-            self.rotation_rate * time + self.prime_meridian, 2.0 * math.pi
+        # calculate stellar longitude
+        stellar_right_ascension = math.atan2(sy, sx)
+        stellar_lon = (
+            stellar_right_ascension - self.rotation_rate * time - self.prime_meridian
         )
-        substellar_lon = (
-            torch.remainder(
-                stellar_right_ascension - spin_angle + math.pi, 2.0 * math.pi
-            )
-            - math.pi
-        )
+        stellar_lon = (stellar_lon + math.pi) % (2.0 * math.pi) - math.pi
+
+        # convert to torch tensor
+        stellar_lat = torch.tensor(stellar_lat, dtype=lat.dtype, device=lat.device)
+        stellar_lon = torch.tensor(stellar_lon, dtype=lon.dtype, device=lon.device)
 
         # calculate stellar flux and incidence angle
         raw_mu0 = (
-            lat.sin() * substellar_lat.sin()
-            + lat.cos() * substellar_lat.cos() * (lon - substellar_lon).cos()
+            lat.sin() * stellar_lat.sin()
+            + lat.cos() * stellar_lat.cos() * (lon - stellar_lon).cos()
         )
         dayside = raw_mu0 > 0.0
         mu0 = torch.where(dayside, raw_mu0, torch.zeros_like(raw_mu0))
@@ -160,4 +119,4 @@ class OrbitalForcing(torch.nn.Module):
         beam = torch.where(
             dayside, torch.ones_like(raw_mu0) * irradiance, torch.zeros_like(raw_mu0)
         )
-        return mu0, beam, distance, substellar_lon, substellar_lat
+        return mu0, beam, distance, stellar_lon, stellar_lat
