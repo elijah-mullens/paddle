@@ -17,7 +17,6 @@ class OrbitalForcing(torch.nn.Module):
         orbital_period: float,
         mean_anomaly: float = 0.0,
         prime_meridian: float = 0.0,
-        hydro_u_key: str = "hydro_u",
         rt_heating_key: str = "rt_heating",
     ) -> None:
         super().__init__()
@@ -33,15 +32,16 @@ class OrbitalForcing(torch.nn.Module):
         self.orbital_period = float(orbital_period)
         self.mean_anomaly = float(mean_anomaly)
         self.prime_meridian = float(prime_meridian)
-        self.hydro_u_key = str(hydro_u_key)
         self.rt_heating_key = str(rt_heating_key)
-        # CPU constants mapping (cos f, sin f) to the stellar direction.
+
+        # mapping (cos f, sin f) to the stellar direction.
         # Planet presets replace this idealized equinox-at-periapsis basis.
         self.solar_basis = (
             (1.0, 0.0),
             (0.0, math.cos(obliquity)),
             (0.0, math.sin(obliquity)),
         )
+
         # torchscript needs this to compile
         self.energy_index = int(kIPR)
 
@@ -52,7 +52,7 @@ class OrbitalForcing(torch.nn.Module):
         stage: int,
     ) -> dict[str, torch.Tensor]:
         # Heating is energy per volume per time; the caller owns stage weights.
-        hydro_du = torch.zeros_like(variables[self.hydro_u_key])
+        hydro_du = torch.zeros_like(variables["hydro_u"])
         hydro_du[self.energy_index] = variables[self.rt_heating_key] * dt
         return {"hydro_du": hydro_du}
 

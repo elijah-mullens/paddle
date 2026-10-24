@@ -14,6 +14,7 @@ class RTStateCubedSphere(RTState):
 
     def __init__(self, stellar_flux: list, block: MeshBlock, config_path: Path):
         super().__init__(block, config_path)
+        self.layout = block.get_layout()
         with open(config_path, encoding="utf-8") as stream:
             config = yaml.safe_load(stream)
         rt_config = config["radiative-transfer"]
@@ -49,35 +50,35 @@ class RTStateCubedSphere(RTState):
         if not math.isfinite(self.time_offset):
             raise ValueError("Orbit time_offset must be finite")
 
+    def compute_rt_bc(self, current_time: float) -> dict[str, torch.Tensor]:
         # each local block has its own global block rank and cube face
-        layout = block.get_layout()
+        layout = self.layout
         face_id = int(layout.loc_of(layout.options.rank())[2])
         face = get_cs_face_name(face_id)
         beta, alpha = torch.meshgrid(
-            self.coord.buffer("x3v")[self.kl : self.ku + 1],
-            self.coord.buffer("x2v")[self.jl : self.ju + 1],
+            self.coord.buffer("x3v"),
+            self.coord.buffer("x2v"),
             indexing="ij",
         )
-        self.lon, self.lat = cs_ab_to_lonlat(face, alpha, beta)
-
-    def compute_rt_bc(self, current_time: float) -> dict[str, torch.Tensor]:
+        lon, lat = cs_ab_to_lonlat(face, alpha, beta)
+        ncol = lon.numel()
         boundary = {}
         for name, orbit, fraction in zip(
             self.shortwave_names, self.stellar_flux, self.stellar_fractions
         ):
             mu0, beam, _, _, _ = orbit.insolation(
-                self.lon, self.lat, current_time + self.time_offset
+                lon, lat, current_time + self.time_offset
             )
             nwave = self.nwave[self.band_names.index(name)]
             # The night beam is zero. A positive dummy cosine avoids 0/0 in Toon.
             boundary[f"{name}/umu0"] = torch.where(
                 mu0 > 0.0, mu0, torch.ones_like(mu0)
-            ).reshape(self.ncol)
+            ).reshape(ncol)
             boundary[f"{name}/fbeam"] = (
-                (fraction * beam).reshape(1, self.ncol).expand(nwave, -1).contiguous()
+                (fraction * beam).reshape(1, ncol).expand(nwave, -1)
             )
         for name, nwave, albedo in zip(self.band_names, self.nwave, self.albedo):
             boundary[f"{name}/albedo"] = torch.full(
-                (nwave, self.ncol), albedo, dtype=self.lon.dtype, device=self.lon.device
+                (nwave, ncol), albedo, dtype=lon.dtype, device=lon.device
             )
         return boundary

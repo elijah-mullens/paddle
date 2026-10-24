@@ -174,8 +174,8 @@ opacities:
     parameters:
       kind: gas
       kappa_ref: [0.001, 0.002, 0.001]
-      p_ref: 1.0e+5
       exponent: [0.5, 0.5, 0.5]
+
   gas-lw:
     type: jit
     data: [gas_lw.pt]
@@ -186,6 +186,7 @@ opacities:
       kind: gas
       kappa_ref: [0.005, 0.01, 0.005]
       exponent: [0.7, 0.7, 0.7]
+
   cloud-sw:
     type: jit
     data: [cloud_sw.pt]
@@ -197,6 +198,7 @@ opacities:
       mass_extinction: [100.0, 100.0, 80.0, 80.0]
       single_scattering_albedo: [0.99, 0.99, 0.98, 0.98]
       asymmetry: [0.75, 0.75, 0.7, 0.7]
+
   cloud-lw:
     type: jit
     data: [cloud_lw.pt]

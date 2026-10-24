@@ -7,6 +7,8 @@ from kintera import ThermoX
 from pyharp import Radiation, RadiationOptions
 from snapy import MeshBlock, kICY, kIPR
 
+RT_HEATING_KEY = "rt_heating"
+
 
 class RTState:
     """Hold a block's radiative heating fixed between radiation updates."""
@@ -19,61 +21,28 @@ class RTState:
         self.update_dt = float(rt_config["update_dt"])
         if not math.isfinite(self.update_dt) or self.update_dt < 0.0:
             raise ValueError("update_dt must be finite and nonnegative")
+
         self.next_update = -math.inf
-        self.last_update = -math.inf
-        self.heating = None
         self.net_flux = None
-        self.rt_heating_key = rt_config.get("heating_key", "rt_heating")
-        self.block = block
         self.coord = block.module("coord")
         self.eos = block.module("hydro.eos")
         self.thermo_y = block.module("hydro.eos.thermo")
-        grid = self.coord.buffer("x1v")
+
+        x1v = self.coord.buffer("x1v")
+        x2v = self.coord.buffer("x2v")
+        x3v = self.coord.buffer("x3v")
         self.thermo_x = ThermoX(self.thermo_y.options)
-        self.thermo_x.to(device=grid.device, dtype=grid.dtype)
+        self.thermo_x.to(device=x1v.device, dtype=x1v.dtype)
 
-        # restrict radiation to active columns and layers, not halo cells
-        self.il, self.iu = self.coord.il(), self.coord.iu()
-        self.jl, self.ju = self.coord.jl(), self.coord.ju()
-        self.kl, self.ku = self.coord.kl(), self.coord.ku()
-        self.cells = (
-            slice(self.kl, self.ku + 1),
-            slice(self.jl, self.ju + 1),
-            slice(self.il, self.iu + 1),
-        )
-        self.ncol = (self.ku - self.kl + 1) * (self.ju - self.jl + 1)
-        self.nlyr = self.iu - self.il + 1
-        self.area = self.coord.face_area1()[
-            self.kl : self.ku + 1, self.jl : self.ju + 1, self.il : self.iu + 2
-        ].reshape(self.ncol, self.nlyr + 1)
-        self.volume = self.coord.cell_volume()[self.cells].reshape(self.ncol, self.nlyr)
-        self.dz = self.coord.buffer("dx1f")[self.il : self.iu + 1]
-
-        # PyHarp reads band definitions but needs quadrature and local sizes
+        # configure local column sizes and band quadrature (needed for domain composition)
         options = RadiationOptions.from_yaml(str(config_path))
-        if not options.bands():
-            raise ValueError("Radiation requires at least one band")
         for band, band_config in zip(options.bands(), config["bands"]):
-            band.ncol(self.ncol).nlyr(self.nlyr)
-            weights = band_config.get("weights", [1.0] if band.nwave() == 1 else [])
-            if (
-                len(weights) != band.nwave()
-                or any(not math.isfinite(float(w)) or float(w) < 0.0 for w in weights)
-                or sum(float(w) for w in weights) <= 0.0
-            ):
-                raise ValueError(
-                    "Each band needs nonnegative finite weights with positive sum"
-                )
-            band.weight([float(weight) for weight in weights])
-            for opacity in band.opacities().values():
-                opacity.opacity_files(
-                    [
-                        str((config_path.parent / path).resolve())
-                        for path in opacity.opacity_files()
-                    ]
-                )
+            band.ncol(x2v.numel() * x3v.numel())
+            band.nlyr(self.coord.iu() - self.coord.il() + 1)
+            band.weight(band_config.get("weights", [1.0]))
+
         self.radiation = Radiation(options)
-        self.radiation.to(device=grid.device, dtype=grid.dtype)
+        self.radiation.to(device=x1v.device, dtype=x1v.dtype)
 
     def compute_rt_bc(self, current_time: float) -> dict[str, torch.Tensor]:
         raise NotImplementedError("Subclasses must provide radiation boundaries")
@@ -82,42 +51,43 @@ class RTState:
     def update_heating(
         self, variables: dict[str, torch.Tensor], current_time: float
     ) -> None:
-        """Store q_rad [W/m³], recomputing on first call, expiry, or time rewind."""
+        """Store q_rad [W/m^3], recomputing when missing or due."""
         if not math.isfinite(current_time):
             raise ValueError("current_time must be finite")
-        if (
-            self.heating is not None
-            and self.last_update <= current_time < self.next_update
-        ):
-            variables[self.rt_heating_key] = self.heating
+        if RT_HEATING_KEY in variables and current_time < self.next_update:
             return
 
-        # recover thermodynamics on active cells, with species last for PyHarp
-        hydro_w = variables["hydro_w"][(slice(None),) + self.cells]
+        # use current geometry, including horizontal ghost columns
+        il, iu = self.coord.il(), self.coord.iu()
+        hydro_w = variables["hydro_w"][..., il : iu + 1]
+        ncol = hydro_w.shape[1] * hydro_w.shape[2]
+        nlyr = iu - il + 1
+        area = self.coord.face_area1()[..., il : iu + 2].reshape(ncol, nlyr + 1)
+        volume = self.coord.cell_volume()[..., il : iu + 1].reshape(ncol, nlyr)
+        dz = self.coord.buffer("dx1f")[il : iu + 1]
+
+        # compute thermodynamics, with species last for pyharp
         pres = hydro_w[kIPR]
         temp = self.eos.compute("W->T", (hydro_w,))
         xfrac = self.thermo_y.compute("Y->X", (hydro_w[kICY:],))
         conc = self.thermo_x.compute("TPX->V", (temp, pres, xfrac))
         atm = {
-            "pres": pres.reshape(self.ncol, self.nlyr),
-            "temp": temp.reshape(self.ncol, self.nlyr),
+            "pres": pres.reshape(ncol, nlyr),
+            "temp": temp.reshape(ncol, nlyr),
         }
-        conc = conc.reshape(self.ncol, self.nlyr, conc.shape[-1])
+        conc = conc.reshape(ncol, nlyr, conc.shape[-1])
 
         # net flux is upward-positive, ordered from bottom to top
         boundary = self.compute_rt_bc(current_time)
-        net_flux, _, _ = self.radiation.forward(conc, self.dz, boundary, atm)
+        net_flux, _, _ = self.radiation.forward(conc, dz, boundary, atm)
         heating = (
-            -(self.area[:, 1:] * net_flux[:, 1:] - self.area[:, :-1] * net_flux[:, :-1])
-            / self.volume
+            -(area[:, 1:] * net_flux[:, 1:] - area[:, :-1] * net_flux[:, :-1]) / volume
         )
         if not torch.isfinite(heating).all():
             raise RuntimeError("Radiation produced nonfinite heating")
 
-        # use a spatial field, with halos zero; publish only a successful solve
-        self.heating = torch.zeros_like(variables["hydro_w"][kIPR])
-        self.heating[self.cells] = heating.reshape(pres.shape)
+        # store net flux for diagnostics; radial ghost layers remain zero
+        variables[RT_HEATING_KEY] = torch.zeros_like(variables["hydro_w"][kIPR])
+        variables[RT_HEATING_KEY][..., il : iu + 1] = heating.reshape(pres.shape)
         self.net_flux = net_flux.detach().clone()
-        variables[self.rt_heating_key] = self.heating
-        self.last_update = float(current_time)
         self.next_update = current_time + self.update_dt

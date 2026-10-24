@@ -52,9 +52,10 @@ the dry species. Its precise gas/condensate thermodynamics belong to Kintera;
 formula.
 
 The hydrodynamic primitive array has shape
-``(nvar, nc3, nc2, nc1)``, including halo cells. Radiation uses only
-``kl:ku+1, jl:ju+1, il:iu+1`` from the coordinate module. If the active sizes
-are :math:`N_3,N_2,N_1`, then
+``(nvar, nc3, nc2, nc1)``, including halo cells. Radiation retains all
+horizontal columns, including ghosts, and slices only the active radial
+layers ``il:iu+1``. If the full horizontal sizes are :math:`N_3,N_2` and
+the active radial size is :math:`N_1`, then
 
 .. math::
 
@@ -63,13 +64,19 @@ are :math:`N_3,N_2,N_1`, then
 Pressure and temperature become ``(ncol, nlyr)``; concentration becomes
 ``(ncol, nlyr, nspecies)``. The radius/layer direction is last and remains
 ordered **bottom to top**. Flattening only the two horizontal axes preserves
-the same column order as the cubed-sphere longitude/latitude grid.
+the same column order as the full cubed-sphere longitude/latitude grid.
+The horizontal dimensions are flattened without explicit contiguous copies.
+Radial slicing may leave strided views; these are passed directly to PyHarp.
+Layer bounds, sizes, areas and volumes are read from the current geometry
+on each radiation update. Longitude and latitude are also recomputed for
+each boundary evaluation. PyHarp work arrays are rebuilt if dimensions change.
 The layer thickness array ``dx1f[il:iu+1]`` has units m and shape ``(nlyr,)``.
 
 For each band, the code sets PyHarp's local ``ncol`` and ``nlyr`` before
-constructing ``Radiation``. This avoids using global YAML dimensions or
-including halos in the radiation solve. Relative opacity file paths are
-resolved against the configuration file's directory. A one-wave grey band
+constructing ``Radiation``. These sizes include horizontal ghost columns
+but exclude radial ghost layers. PyHarp loads the opacity definitions and
+files directly; the Uranus preparation step supplies absolute file paths.
+A one-wave grey band
 uses weight one; multi-wave bands require explicit ``weights``.
 
 Band illumination on the cubed sphere
@@ -77,10 +84,10 @@ Band illumination on the cubed sphere
 
 A process may own several blocks. ``RTStateCubedSphere`` uses each block's
 own layout rank, obtains its cube face with ``loc_of(rank)``, and calls
-``snapy.coord.cs_ab_to_lonlat`` on that block's active ``x2v`` and ``x3v``
-coordinates. The resulting planetocentric latitude and east longitude are
-cached because the mesh geometry is fixed. Construct the state after moving
-the mesh to its final device/dtype; recreate it if the mesh geometry changes.
+``snapy.coord.cs_ab_to_lonlat`` on that block's full ``x2v`` and ``x3v``
+coordinates. Planetocentric latitude and east longitude are recomputed
+from the current coordinates for each boundary evaluation. Construct the
+state after moving the mesh to its final device/dtype.
 
 For each non-Planck band, supply one orbital model, in YAML band order.
 Thermal bands carry the ``planck`` flag; they may be interleaved with
@@ -167,8 +174,8 @@ Only the flux divergence uses spherical areas/volumes; no additional PyHarp
 spherical-rescaling inputs are supplied.
 
 ``rt_heating`` has the spatial shape ``(nc3, nc2, nc1)``, **without** a
-hydrodynamic variable axis. The active cells receive :math:`q_i`; halos remain
-zero. A separate ``net_flux`` snapshot is kept for diagnostics. Nonfinite
+hydrodynamic variable axis. All horizontal columns receive :math:`q_i`
+on active radial layers; radial ghost layers remain zero. A separate ``net_flux`` snapshot is kept for diagnostics. Nonfinite
 heating raises an error before replacing the previously cached result.
 
 Scheduling and stage integration
@@ -182,9 +189,10 @@ time. After a successful solve at :math:`t_r`,
 
    t_{\rm next}=t_r+\Delta t_{\rm RT}.
 
-Calls in :math:`[t_r,t_{\rm next})` reattach the cached field to the variable
-dictionary. At the deadline a new solve is due. A time rewind to before
-:math:`t_r` also forces recomputation. ``update_dt=0`` means solve on every
+Calls in :math:`[t_r,t_{\rm next})` reuse the heating field already in the
+variable dictionary. ``RTState`` does not store a second reference to heating.
+If the field is missing, or the deadline has arrived, a new solve is due.
+Only the next deadline is stored; time stepping is assumed to advance. ``update_dt=0`` means solve on every
 call. Each block owns its own cache and boundary configuration; no class-level
 mutable lists are shared. On restart, create new states so the first radiation
 call rebuilds heating rather than depending on a checkpointed cache.
@@ -216,7 +224,8 @@ Running the Uranus example
 
 ``paddle/uranus.yaml`` contains seven thermodynamic species, a 12-layer
 radial grid, and an 8-by-8 active grid on each cube face. Six local blocks
-cover all faces in one process. Three halos support the configured
+cover all faces in one process. With three horizontal ghosts on each edge,
+radiation solves 14-by-14 columns per face. Three halos support the configured
 reconstruction. The original large-grid setup is reduced to make this example
 practical on CPU as well as GPU.
 
@@ -274,8 +283,8 @@ YAML, models, and diagnostics are written only to ``--output-dir``.
 Validation and reproduction
 ---------------------------
 
-The focused tests check active-cell slicing, the sign and area/volume factors
-in heating, cache deadlines, time rewinds, empty/restarted caches, failure
+The focused tests check horizontal ghost columns, active radial slicing, the sign and area/volume factors
+in heating, cache deadlines, empty/restarted caches, failure
 handling, band mapping, and night-side boundaries. Integration tests execute
 the real six-face example on CPU and CUDA, check distinct face coordinates,
 finite fields, and column energy closure. Orbital and opacity tests also cover
