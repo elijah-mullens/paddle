@@ -9,8 +9,7 @@ included figures. Future notes can be added to this contents list.
 .. toctree::
    :maxdepth: 2
 
-   orbital/index
-   opacity/index
+   radiation/index
 
 Build the collection with Sphinx installed, from the repository root:
 

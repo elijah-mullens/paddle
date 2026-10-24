@@ -1,0 +1,225 @@
+reference-state:
+  Tref: 0.0
+  Pref: 1.0e+5
+
+species:
+  - name: dry
+    composition: {H: 1.5, He: 0.15}
+    cv_R: 2.5
+
+  - name: CH4
+    composition: {C: 1, H: 4}
+    cv_R: 3.5
+    u0_R: 0.0
+
+  - name: H2S
+    composition: {H: 2, S: 1}
+    cv_R: 3.5
+    u0_R: 0.0
+
+  - name: CH4(s)
+    composition: {C: 1, H: 4}
+    cv_R: 4.5
+    u0_R: -980.0
+
+  - name: CH4(s,p)
+    composition: {C: 1, H: 4}
+    cv_R: 4.5
+    u0_R: -980.0
+
+  - name: H2S(s)
+    composition: {H: 2, S: 1}
+    cv_R: 4.5
+    u0_R: -2250.0
+
+  - name: H2S(s,p)
+    composition: {H: 2, S: 1}
+    cv_R: 4.5
+    u0_R: -2250.0
+
+geometry:
+  type: gnomonic-equiangle
+
+  bounds:
+    x1min: 2.5559e7
+    x1max: 2.58007e7
+    x2min_pi: -0.25
+    x2max_pi: 0.25
+    x3min_pi: -0.25
+    x3max_pi: 0.25
+
+  cells:
+    nx1: 12
+    nx2: 8
+    nx3: 8
+    nghost: 3
+
+distribute:
+  layout: cubed-sphere
+  blocks_per_process: 6
+  nb2: 1
+  nb3: 1
+  verbose: false
+
+dynamics:
+  equation-of-state:
+    type: ideal-moist
+    density-floor: 1.0e-10
+    pressure-floor: 1.0e-10
+    limiter: true
+    max-iter: 30
+    ftol: 1.0e-06
+
+  reconstruct:
+    vertical: {type: weno5, scale: true, shock: true}
+    horizontal: {type: weno5, scale: true, shock: true}
+
+  riemann-solver:
+    type: hllc
+
+boundary-condition:
+  external:
+    x1-inner: reflecting
+    x1-outer: reflecting
+    x2-inner: custom
+    x2-outer: custom
+    x3-inner: custom
+    x3-outer: custom
+
+integration:
+    type: rk3
+    cfl: 0.45
+    implicit-scheme: 9
+    nlim: 2
+    tlim: 60.0
+    ncycle_out: 10
+
+outputs: []
+
+forcing:
+  const-gravity:
+    grav1: -8.69
+
+  coriolis:
+    type: xyz
+    omega1: -0.0001012371955898186  # retrograde about IAU north
+
+  bot-heat:
+    flux: 0.042
+    depth: 2
+
+sedimentation:
+  radius:
+    CH4(s,p): 0.0001
+    H2S(s,p): 0.0001
+
+  density:
+    CH4(s,p): 520.0
+    H2S(s,p): 1350.0
+
+  const-vsed:
+    CH4(s,p): -1.0
+    H2S(s,p): -1.0
+
+reactions:
+  - equation: CH4 => CH4(s)
+    type: nucleation
+    rate-constant: {formula: ch4_ideal}
+
+  - equation: CH4(s) => CH4(s,p)
+    type: coagulation
+    rate-constant: {A: 1.e-4, b: 0.0, Ea_R: 0.0}
+
+  - equation: CH4(s,p) => CH4
+    type: evaporation
+    rate-constant: {formula: ch4_ideal, diff_c: 2.0e-05, diff_T: 0.0, diff_P: 0.0, vm: 1.6e-05, diameter: 0.001}
+
+  - equation: H2S => H2S(s)
+    type: nucleation
+    rate-constant: {formula: h2s_ideal}
+
+  - equation: H2S(s) => H2S(s,p)
+    type: coagulation
+    rate-constant: {A: 1.e-4, b: 0.0, Ea_R: 0.0}
+
+  - equation: H2S(s,p) => H2S
+    type: evaporation
+    rate-constant: {formula: h2s_ideal, diff_c: 2.0e-05, diff_T: 0.0, diff_P: 0.0, vm: 3.4e-05, diameter: 0.001}
+
+problem:
+  Ps: 2062000.0
+  Ts: 160.0
+  Tmin: 55.0
+  xCH4: 0.023
+  xH2S: 0.0004
+
+# The example exports TorchScript artifacts into its output directory.
+# Grey coefficients are illustrative, not a calibrated Uranus spectrum.
+orbit:
+  time_offset: 0.0  # seconds since J2000 at simulation time zero
+
+radiative-transfer:
+  update_dt: 3600.0
+  stellar_fractions: {sw: 1.0}  # all bolometric stellar power in one grey band
+  sw_albedo: 0.0
+  lw_albedo: 0.0
+
+opacities:
+  gas-sw:
+    type: jit
+    data: [gas_sw.pt]
+    species: [dry, CH4, H2S]
+    jit_kwargs: [pres, temp]
+    nmom: 1
+    parameters:
+      kind: gas
+      kappa_ref: [0.001, 0.002, 0.001]
+      p_ref: 1.0e+5
+      exponent: [0.5, 0.5, 0.5]
+  gas-lw:
+    type: jit
+    data: [gas_lw.pt]
+    species: [dry, CH4, H2S]
+    jit_kwargs: [pres, temp]
+    nmom: 1
+    parameters:
+      kind: gas
+      kappa_ref: [0.005, 0.01, 0.005]
+      exponent: [0.7, 0.7, 0.7]
+  cloud-sw:
+    type: jit
+    data: [cloud_sw.pt]
+    species: [CH4(s), "CH4(s,p)", H2S(s), "H2S(s,p)"]
+    jit_kwargs: [pres, temp]
+    nmom: 1
+    parameters:
+      kind: cloud
+      mass_extinction: [100.0, 100.0, 80.0, 80.0]
+      single_scattering_albedo: [0.99, 0.99, 0.98, 0.98]
+      asymmetry: [0.75, 0.75, 0.7, 0.7]
+  cloud-lw:
+    type: jit
+    data: [cloud_lw.pt]
+    species: [CH4(s), "CH4(s,p)", H2S(s), "H2S(s,p)"]
+    jit_kwargs: [pres, temp]
+    nmom: 1
+    parameters:
+      kind: cloud
+      mass_extinction: [20.0, 20.0, 15.0, 15.0]
+      single_scattering_albedo: [0.25, 0.25, 0.2, 0.2]
+      asymmetry: [0.55, 0.55, 0.5, 0.5]
+
+bands:
+  - name: sw
+    range: [10000.0, 50000.0]
+    opacities: [gas-sw, cloud-sw]
+    solver: toon
+    nwave: 1
+    weights: [1.0]
+  - name: lw
+    range: [10.0, 10000.0]
+    opacities: [gas-lw, cloud-lw]
+    solver: toon
+    flags: planck
+    nwave: 1
+    weights: [1.0]

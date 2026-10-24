@@ -54,7 +54,7 @@ class OrbitalForcing(torch.nn.Module):
         # Heating is energy per volume per time; the caller owns stage weights.
         hydro_du = torch.zeros_like(variables[self.hydro_u_key])
         hydro_du[self.energy_index] = variables[self.rt_heating_key] * dt
-        return {self.hydro_u_key: hydro_du}
+        return {"hydro_du": hydro_du}
 
     @torch.jit.export
     def insolation(

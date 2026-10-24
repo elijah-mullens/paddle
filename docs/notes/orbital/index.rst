@@ -1,11 +1,13 @@
-Keplerian orbital illumination
-==============================
+1. Orbital illumination
+=======================
 
 Scope and interface
 -------------------
 
+The first step is the radiation arriving at the top of the atmosphere.
 ``paddle/orbital/orbital.py`` implements ``OrbitalForcing``, a PyTorch module
-that separates illumination geometry from application of radiative heating.
+that supplies this illumination geometry. Its small stage-forcing method also
+applies the heating calculated later in :doc:`../radiation/rt_state`.
 ``paddle/orbital/planets.py`` provides ``Earth``, ``Jupiter``, ``Saturn``,
 ``Uranus``, and ``Neptune`` subclasses. These are fixed elliptical orbits
 for atmospheric experiments, with spherical surfaces and constant spin.
@@ -138,8 +140,8 @@ about 82 degrees. Keeping these two conventions distinct preserves the sign
 of latitude and retrograde rotation. All presets expose east-positive
 longitude, even where published planetary maps use west-positive longitude.
 
-Illumination and heating
-------------------------
+Incident radiation
+------------------
 
 At longitude :math:`\lambda` and latitude :math:`\phi`, the outward surface
 normal dotted with the stellar direction gives
@@ -161,24 +163,12 @@ A spherical global average is :math:`S/4`. Albedo, atmospheric attenuation,
 ring shadows, eclipses, refraction, finite stellar angular size, and internal
 heat flux are outside this module.
 
-``forward(variables, dt, stage)`` applies an already computed heating rate:
-
-.. math::
-
-   (\Delta U)_j=\begin{cases}q_{\rm rad}\,\Delta t,&j=j_E,\\
-                            0,&j\ne j_E.\end{cases}
-
-The energy index :math:`j_E` is taken from ``snapy.kIPR`` on the leading
-variable axis. The constructor stores it as ``self.energy_index`` so that
-TorchScript can compile the update. The base class and planet presets use
-this Snapy index rather than accepting an index argument. The variable keys
-default to ``hydro_u`` and ``rt_heating`` and can be set in the constructor.
-For an energy density in J/m³ the heating
-must be W/m³; temperature tendencies must first be converted consistently
-with the atmospheric model. The method returns an increment dictionary,
-without mutating the input state. ``stage`` is accepted but unused: the
-integrator owns stage weighting. Insolation does not automatically populate
-the heating field.
+The normal beam :math:`B` and incidence cosine :math:`\mu_0` are passed
+separately to the radiation solver: it applies the projection and optical path
+length itself. Multiplying the beam by :math:`\mu_0` before passing it would
+apply the projection twice. The :doc:`next section <../opacity/index>` supplies
+the material properties needed to turn this boundary illumination into fluxes
+through the atmosphere.
 
 Planet presets and provenance
 -----------------------------

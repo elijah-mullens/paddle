@@ -1,9 +1,11 @@
-Batched gas and cloud opacity
-=============================
+2. Gas and cloud opacity
+========================
 
 Scope and interface
 -------------------
 
+The orbit supplies the incoming beam, but not its attenuation or the thermal
+emission of the atmosphere. Those require the material's optical properties.
 ``paddle/rt/opacity.py`` provides two simple grey optical-property modules:
 ``GasOpacity`` combines pressure-dependent absorption from several gases,
 and ``CloudOpacity`` combines extinction and scattering from several
@@ -194,17 +196,11 @@ homogeneous layer of thickness :math:`\Delta z`,
 
    \tau=\beta\Delta z.
 
-Only the first output property is multiplied by layer thickness:
-
-.. code-block:: python
-
-   prop = cloud(conc, pres, temp)
-   prop[..., 0] *= dz.view(1, 1, -1)  # dz is (nlyr,) in meters
-
-Albedo and asymmetry are dimensionless and must stay unchanged. At the time
-of writing, the existing helpers in ``two_stream_solvers.py`` multiply the
-whole property array by ``dz``. That conversion must be corrected before
-using them with nonzero scattering properties from ``CloudOpacity``.
+Only the first output property is multiplied by layer thickness. Albedo and
+asymmetry are dimensionless and remain unchanged. In the coupled workflow,
+PyHarp's ``Radiation`` performs this conversion internally, after combining
+the gas and cloud coefficients. Pass extinction per length from the opacity
+modules; do not apply ``dz`` a second time in ``RTState``.
 
 Likewise, gas and cloud output arrays cannot simply be added. If their
 extinctions are :math:`\beta_g,\beta_c` and the cloud properties are
@@ -217,7 +213,10 @@ extinctions are :math:`\beta_g,\beta_c` and the cloud properties are
    g_{\rm total}=g_c
 
 when cloud scattering is nonzero. Use zero for undefined ratios, as above.
-The opacity classes do not perform this gas-plus-cloud combination themselves.
+PyHarp's ``RadiationBand`` performs this weighted combination for the
+opacities listed in each band. The :doc:`radiation-state section
+<../radiation/rt_state>` connects these band definitions to the atmospheric
+state and completes the calculation of heating.
 
 Examples and reproducible figures
 ---------------------------------
