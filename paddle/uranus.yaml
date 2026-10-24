@@ -155,12 +155,8 @@ problem:
 
 # The example exports TorchScript artifacts into its output directory.
 # Grey coefficients are illustrative, not a calibrated Uranus spectrum.
-orbit:
-  time_offset: 0.0  # seconds since J2000 at simulation time zero
-
 radiative-transfer:
   update_dt: 3600.0
-  stellar_fractions: {sw: 1.0}  # all bolometric stellar power in one grey band
   sw_albedo: 0.0
   lw_albedo: 0.0
 

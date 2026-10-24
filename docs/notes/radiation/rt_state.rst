@@ -69,7 +69,7 @@ The horizontal dimensions are flattened without explicit contiguous copies.
 Radial slicing may leave strided views; these are passed directly to PyHarp.
 Layer bounds, sizes, areas and volumes are read from the current geometry
 on each radiation update. Longitude and latitude are also recomputed for
-each boundary evaluation. PyHarp work arrays are rebuilt if dimensions change.
+each boundary evaluation. Recreate the radiation state if cell counts change.
 The layer thickness array ``dx1f[il:iu+1]`` has units m and shape ``(nlyr,)``.
 
 For each band, the code sets PyHarp's local ``ncol`` and ``nlyr`` before
@@ -93,21 +93,22 @@ For each non-Planck band, supply one orbital model, in YAML band order.
 Thermal bands carry the ``planck`` flag; they may be interleaved with
 shortwave bands. The example has one shortwave and one longwave band.
 
-With simulation time :math:`t` and configured ``orbit.time_offset``
-:math:`t_0`, the orbital call uses :math:`t+t_0` seconds since J2000. If a
-restart returns the original elapsed simulation time, preserve the same
-:math:`t_0`; do not add the restart time twice.
+The orbital call receives ``current_time`` directly. For the planet presets,
+this is elapsed time in seconds since J2000; simulation time zero therefore
+corresponds to J2000. Preserve that time origin when restarting.
 
-For a shortwave band :math:`b`, the boundary dictionary contains
+For a shortwave band :math:`b`, its illumination model supplies the actual
+band-integrated, beam-normal irradiance :math:`B_b` in W/m² and the incidence
+cosine :math:`\mu_b`. ``RTStateCubedSphere`` passes the returned beam directly
+to ``<band>/fbeam``, without multiplying by a spectral fraction or the cosine.
+For example, two models returning 12 and 31 W/m² produce shortwave boundary
+beams of 12 and 31 W/m², respectively.
 
-.. math::
-
-   B_b=f_b B,\qquad \mu_b=\mu_0,
-
-where :math:`f_b` is ``radiative-transfer.stellar_fractions[b]``. Fractions
-are nonnegative and sum to at most one. The demonstration assigns all
-bolometric sunlight to one grey shortwave band; its wavelength limits do not
-by themselves calculate the stellar spectral fraction.
+The demonstration uses the Uranus preset's bolometric beam for its single
+grey shortwave band. For multiple shortwave bands, each model must supply
+its own band flux; the YAML wavelength limits do not partition the stellar
+power automatically. The models retain the ``insolation(lon, lat, time)``
+interface described in section 1, including zero beam on the night side.
 
 The exact PyHarp keys and shapes are:
 

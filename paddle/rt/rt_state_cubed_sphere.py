@@ -10,7 +10,7 @@ from .rt_state import RTState
 
 
 class RTStateCubedSphere(RTState):
-    """One orbital illumination model per shortwave band, in YAML band order."""
+    """One illumination model returning actual flux per shortwave band, in YAML order."""
 
     def __init__(self, stellar_flux: list, block: MeshBlock, config_path: Path):
         super().__init__(block, config_path)
@@ -18,37 +18,28 @@ class RTStateCubedSphere(RTState):
         with open(config_path, encoding="utf-8") as stream:
             config = yaml.safe_load(stream)
         rt_config = config["radiative-transfer"]
-        self.band_names = [band["name"] for band in config["bands"]]
-        if len(set(self.band_names)) != len(self.band_names):
-            raise ValueError("Radiation band names must be unique")
-        self.nwave = [int(band["nwave"]) for band in config["bands"]]
-        self.shortwave_names = []
-        for band in config["bands"]:
+
+        # use planck to decide if shortwave band
+        bands = self.radiation.options.bands()
+        self.shortwave_indices = []
+        for i, band in enumerate(config["bands"]):
             flags = band.get("toon", {}).get("flags", band.get("flags", ""))
             if "planck" not in flags.replace(",", " ").split():
-                self.shortwave_names.append(band["name"])
+                self.shortwave_indices.append(i)
                 if not math.isclose(sum(band.get("weights", [1.0])), 1.0):
                     raise ValueError(
                         "Shortwave weights must sum to one for band-integrated beams"
                     )
-        if len(stellar_flux) != len(self.shortwave_names):
+        if len(stellar_flux) != len(self.shortwave_indices):
             raise ValueError("Provide one orbital model per shortwave band")
         self.stellar_flux = list(stellar_flux)
-        self.stellar_fractions = [
-            float(rt_config["stellar_fractions"][name]) for name in self.shortwave_names
-        ]
-        if any(f < 0.0 or not math.isfinite(f) for f in self.stellar_fractions):
-            raise ValueError("Stellar fractions must be finite and nonnegative")
-        if sum(self.stellar_fractions) > 1.0 + 1.0e-12:
-            raise ValueError("Stellar fractions must sum to at most one")
+
+        # save albedo
         self.albedo = [
-            float(rt_config.get(f"{name}_albedo", 0.0)) for name in self.band_names
+            float(rt_config.get(f"{band.name()}_albedo", 0.0)) for band in bands
         ]
         if any(not 0.0 <= value <= 1.0 for value in self.albedo):
             raise ValueError("Albedos must be between zero and one")
-        self.time_offset = float(config.get("orbit", {}).get("time_offset", 0.0))
-        if not math.isfinite(self.time_offset):
-            raise ValueError("Orbit time_offset must be finite")
 
     def compute_rt_bc(self, current_time: float) -> dict[str, torch.Tensor]:
         # each local block has its own global block rank and cube face
@@ -61,24 +52,23 @@ class RTStateCubedSphere(RTState):
             indexing="ij",
         )
         lon, lat = cs_ab_to_lonlat(face, alpha, beta)
+
         ncol = lon.numel()
-        boundary = {}
-        for name, orbit, fraction in zip(
-            self.shortwave_names, self.stellar_flux, self.stellar_fractions
-        ):
-            mu0, beam, _, _, _ = orbit.insolation(
-                lon, lat, current_time + self.time_offset
-            )
-            nwave = self.nwave[self.band_names.index(name)]
+        bands = self.radiation.options.bands()
+        rt_bc = {}
+        for i, orbit in zip(self.shortwave_indices, self.stellar_flux):
+            band = bands[i]
+            mu0, beam, _, _, _ = orbit.insolation(lon, lat, current_time)
             # The night beam is zero. A positive dummy cosine avoids 0/0 in Toon.
-            boundary[f"{name}/umu0"] = torch.where(
+            rt_bc[f"{band.name()}/umu0"] = torch.where(
                 mu0 > 0.0, mu0, torch.ones_like(mu0)
             ).reshape(ncol)
-            boundary[f"{name}/fbeam"] = (
-                (fraction * beam).reshape(1, ncol).expand(nwave, -1)
+            rt_bc[f"{band.name()}/fbeam"] = beam.reshape(1, ncol).expand(
+                band.nwave(), -1
             )
-        for name, nwave, albedo in zip(self.band_names, self.nwave, self.albedo):
-            boundary[f"{name}/albedo"] = torch.full(
-                (nwave, ncol), albedo, dtype=lon.dtype, device=lon.device
+
+        for band, albedo in zip(bands, self.albedo):
+            rt_bc[f"{band.name()}/albedo"] = torch.full(
+                (band.nwave(), ncol), albedo, dtype=lon.dtype, device=lon.device
             )
-        return boundary
+        return rt_bc
