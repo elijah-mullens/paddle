@@ -77,7 +77,7 @@ class OrbitalForcing(torch.nn.Module):
             eccentric_anomaly = math.pi if mean_anomaly >= 0.0 else -math.pi
 
         # calculate distance
-        for _ in range(32):
+        for _ in range(8):
             eccentric_anomaly -= (
                 eccentric_anomaly
                 - self.eccentricity * math.sin(eccentric_anomaly)
