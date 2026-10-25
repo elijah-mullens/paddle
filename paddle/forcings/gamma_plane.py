@@ -5,9 +5,9 @@ from snapy import kIDN, kIV2, kIV3
 class GammaPlaneCoriolis(torch.nn.Module):
     """Polar Coriolis forcing with x1 up and x2/x3 in the tangent plane.
 
-    f = f0 - gamma * ((x2 - x0)**2 + (x3 - y0)**2), with f0 in s^-1,
+    f = f0 - 0.5 * gamma * ((x2 - x0)**2 + (x3 - y0)**2), with f0 in s^-1,
     gamma in m^-2 s^-1, and the pole location (x0, y0) in meters.
-    For a spherical planet of radius R, gamma = f0 / (2*R**2);
+    For a spherical planet of radius R, gamma = f0 / (R**2);
     f0 and gamma have the same sign, positive at the north pole for
     prograde rotation. Use instead of the native Coriolis forcing.
     """
@@ -39,7 +39,7 @@ class GammaPlaneCoriolis(torch.nn.Module):
         hydro_w = variables["hydro_w"]
         x = variables["coord.x2v"].reshape(1, -1, 1) - self.x0
         y = variables["coord.x3v"].reshape(-1, 1, 1) - self.y0
-        f = self.f0 - self.gamma * (x * x + y * y)
+        f = self.f0 - 0.5 * self.gamma * (x * x + y * y)
 
         # du/dt = f*v, dv/dt = -f*u; the caller applies stage weights.
         hydro_du = torch.zeros_like(variables["hydro_u"])
