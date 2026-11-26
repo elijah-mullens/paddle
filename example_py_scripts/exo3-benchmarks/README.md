@@ -90,9 +90,8 @@ DEVICE=cuda python -u hs94_run.py --output-dir out_hs94
 for the W92 contravariant↔geographic velocity rotation), `torch`, `numpy`,
 `pyyaml`.
 
-W92 requires `snapy>=2.7.4`. Earlier 2.7 releases lack either the spherical
-cross-panel velocity exchange or the corrected spherical Coriolis treatment;
-they may start successfully but produce incorrect dynamics.
+Use Paddle's Snapy 3 dependency for W92. The benchmark relies on spherical
+cross-panel velocity exchange and spherical Coriolis forcing.
 
 # Visualizations
 

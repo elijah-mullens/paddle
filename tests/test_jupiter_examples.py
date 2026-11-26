@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import shutil
-import socket
 import subprocess
 import sys
 
@@ -14,12 +13,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_DIR = REPO_ROOT / "example_py_scripts"
 RUN_HYDRO = EXAMPLE_DIR / "run_hydro.py"
 GCM_NPROC = 2
-
-
-def _get_free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
 
 
 @pytest.mark.parametrize(
@@ -58,11 +51,8 @@ def test_run_hydro_jupiter_cpu_examples(tmp_path: Path, yaml_name: str) -> None:
         ]
         timeout = 600
     else:
-        env["MASTER_ADDR"] = "127.0.0.1"
-        env["MASTER_PORT"] = str(_get_free_port())
-        env["RANK"] = "0"
-        env["WORLD_SIZE"] = "1"
-        env["LOCAL_RANK"] = "0"
+        for key in ("MASTER_ADDR", "MASTER_PORT", "RANK", "WORLD_SIZE", "LOCAL_RANK"):
+            env.pop(key, None)
         cmd = [sys.executable, str(RUN_HYDRO), "-i", str(input_path)]
         timeout = 300
 

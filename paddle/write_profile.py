@@ -47,16 +47,20 @@ def write_profile(
     if hydro_w.shape[1] != 1 or hydro_w.shape[2] != 1:
         raise ValueError("hydro_w must have shape (N, 1, 1, L).")
 
+    active = slice(coord.il(), coord.iu() + 1)
+    hydro_w = hydro_w[..., active]
+    x1v = coord.buffer("x1v")[active]
+
     # calculate a height grid
     pres = hydro_w[kIPR, ...].squeeze() / 1.0e5  # Pa -> bar
     zlev_func = interp1d(
         pres.log().cpu().numpy(),
-        coord.buffer("x1v").cpu().numpy(),
+        x1v.cpu().numpy(),
         kind="linear",
         fill_value="extrapolate",
     )
     zref = zlev_func(np.log(ref_pressure / 1.0e5))
-    zlev = (coord.buffer("x1v") - zref) / 1.0e3  # m -> km
+    zlev = (x1v - zref) / 1.0e3  # m -> km
 
     # calculate temperature
     temp = eos.compute("W->T", (hydro_w,)).squeeze()

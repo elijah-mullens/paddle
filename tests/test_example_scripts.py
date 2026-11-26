@@ -4,7 +4,6 @@ import json
 import os
 from pathlib import Path
 import shutil
-import socket
 import subprocess
 import sys
 
@@ -15,12 +14,6 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_DIR = REPO_ROOT / "example_py_scripts"
-
-
-def _get_free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
 
 
 def _base_env() -> dict[str, str]:
@@ -99,11 +92,8 @@ def _run_single(
     script_name: str | Path, yaml_path: Path | None, extra_args: list[str] | None = None
 ) -> None:
     env = _base_env()
-    env["MASTER_ADDR"] = "127.0.0.1"
-    env["MASTER_PORT"] = str(_get_free_port())
-    env["RANK"] = "0"
-    env["WORLD_SIZE"] = "1"
-    env["LOCAL_RANK"] = "0"
+    for key in ("MASTER_ADDR", "MASTER_PORT", "RANK", "WORLD_SIZE", "LOCAL_RANK"):
+        env.pop(key, None)
 
     cmd = [sys.executable, str(EXAMPLE_DIR / script_name)]
     if yaml_path is not None:
@@ -251,4 +241,7 @@ def test_saturn_adiabat_script(tmp_path: Path) -> None:
         yaml_path,
         extra_args=["--output", str(output)],
     )
-    assert output.exists()
+    rows = [
+        line for line in output.read_text().splitlines() if not line.startswith("#")
+    ]
+    assert len(rows) == 64

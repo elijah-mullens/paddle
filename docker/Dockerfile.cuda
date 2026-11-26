@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-ARG CUDA_VER=12.9.1
+ARG CUDA_VER=12.8.1
 ARG UBUNTU_VER=22.04
 
 ############################
@@ -8,10 +8,10 @@ ARG UBUNTU_VER=22.04
 FROM nvidia/cuda:${CUDA_VER}-devel-ubuntu${UBUNTU_VER} AS base
 
 ARG TORCH_VER=2.10.0
-ARG PYDISORT_VER=v1.6.1
-ARG PYHARP_VER=v1.10.2
-ARG KINTERA_VER=v1.4.0
-ARG SNAPY_VER=v1.4.1
+ARG PYDISORT_VER=v1.8.16
+ARG PYHARP_VER=v2.8.2
+ARG KINTERA_VER=v2.6.13
+ARG SNAPY_VER=v3.0.0
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC
@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ripgrep fd-find unzip neovim \
       clangd \
       nodejs npm \
-      libnetcdf-dev nco ncview \
+      libnetcdf-dev libucx-dev autoconf automake libtool nco ncview \
       && rm -rf /var/lib/apt/lists/*
 
 #RUN apt-get install libnccl2 libnccl-dev
@@ -74,7 +74,7 @@ ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
 # Upgrade pip/setuptools/wheel early
-RUN pip install --upgrade pip setuptools wheel build
+RUN pip install --upgrade pip setuptools setuptools-scm wheel build
 
 # Optional: pin pip resolver behavior and set default index/extra-index if needed
 # COPY docker/pip.conf /etc/pip.conf
@@ -149,6 +149,9 @@ ENV TORCH_CUDA_ARCH_LIST="8.6;8.9;9.0+PTX"  \
 ############################
 WORKDIR /workspace
 
+RUN python -m pip install pyyaml 'cmake<=3.30' 'commux>=0.1.4' 'pinc>=0.2.0'
+
+
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/ccache \
     set -eu pipefail; \
@@ -161,7 +164,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     git checkout -f "${PYDISORT_VER}"; \
     cmake -S . -B build -DCMAKE_BUILD_TYPE=Release; \
     cmake --build build --parallel "$(nproc)"; \
-    python -m pip install --no-cache-dir --no-deps --no-build-isolation .
+    python -m pip install --no-cache-dir --no-build-isolation .
 
 ############################
 # Install pyharp
@@ -180,7 +183,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     git checkout -f "${PYHARP_VER}"; \
     cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
     cmake --build build --parallel "$(nproc)"; \
-    python -m pip install --no-cache-dir --no-deps --no-build-isolation .
+    python -m pip install --no-cache-dir --no-build-isolation .
 
 ############################
 # Install kintera
@@ -199,7 +202,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     git checkout -f "${KINTERA_VER}"; \
     cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
     cmake --build build --parallel "$(nproc)"; \
-    python -m pip install --no-cache-dir --no-deps --no-build-isolation .
+    python -m pip install --no-cache-dir --no-build-isolation .
 
 ############################
 # Install snapy
@@ -218,14 +221,16 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     git checkout -f "${SNAPY_VER}"; \
     cmake -S . -B build -DCUDA=ON -DCMAKE_BUILD_TYPE=Release; \
     cmake --build build --parallel "$(nproc)"; \
-    python -m pip install --no-cache-dir --no-deps --no-build-isolation .
+    python -m pip install --no-cache-dir --no-build-isolation .
 
 ############################
 # Install paddle
 ############################
 WORKDIR /workspace
 
-RUN python -m pip install paddle
+COPY pyproject.toml README.md /workspace/paddle/
+COPY paddle/ /workspace/paddle/paddle/
+RUN python -m pip install /workspace/paddle
 
 ############################
 # Final setup
