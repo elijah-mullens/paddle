@@ -120,11 +120,6 @@ def main() -> None:
     cycle = 0
     # Keep running the physics engine loop until the integrator flags that time/cycle constraints are reached
     while not intg.stop(cycle, current_time):
-        # Step up the cycle count tracking integer
-        cycle += 1
-        # Sync the core mesh module state tracker to match this new cycle ID step
-        mesh.set_cycle(cycle)
-
         # Compute the maximum safe delta time step (dt) to keep the simulation stable without crashing
         dt = mesh.max_time_step(block_vars)
         # Log active step metrics (current time, delta time, cycle) straight to terminal output
@@ -145,6 +140,8 @@ def main() -> None:
             break
 
         # Increment simulation clock forward by the safe computed delta time duration
+        cycle += 1
+        mesh.set_cycle(cycle)
         current_time += dt
         # Save updated physical metrics data arrays out to output file trackers on disk
         mesh.make_outputs(block_vars, current_time)

@@ -245,3 +245,43 @@ def test_saturn_adiabat_script(tmp_path: Path) -> None:
         line for line in output.read_text().splitlines() if not line.startswith("#")
     ]
     assert len(rows) == 64
+
+
+@pytest.mark.parametrize(
+    ("script", "deck"),
+    [
+        ("exo3-benchmarks/hs94_run.py", "exo3-benchmarks/hs94.yaml"),
+        ("exo3-benchmarks/hjupiter_run.py", "exo3-benchmarks/hjupiter.yaml"),
+        ("exo3-benchmarks/w92_swe.py", "exo3-benchmarks/w92.yaml"),
+    ],
+)
+def test_exo3_accepted_cycles(tmp_path: Path, script: str, deck: str) -> None:
+    yaml_path = _write_yaml(
+        tmp_path,
+        deck,
+        {
+            "geometry.cells.nx1": 1 if "w92" in deck else 16,
+            "geometry.cells.nx2": 16,
+            "geometry.cells.nx3": 16,
+            "distribute.blocks_per_process": 6,
+            "integration.nlim": 2,
+            "integration.ncycle_out": 1,
+        },
+    )
+    result = subprocess.run(
+        [sys.executable, str(EXAMPLE_DIR / script), "-c", str(yaml_path)],
+        cwd=tmp_path,
+        env=_base_env(),
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    # A retry can repeat the current cycle. Only acceptance advances the clock.
+    cycles = [
+        line.split()[0]
+        for line in result.stdout.splitlines()
+        if line.startswith("cycle=")
+    ]
+    assert list(dict.fromkeys(cycles)) == ["cycle=0", "cycle=1"]
+    assert "cycle=2" in result.stdout and "Terminating on cycle limit" in result.stdout

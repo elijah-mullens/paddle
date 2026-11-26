@@ -157,8 +157,6 @@ def main():
     cycle = 0
     mesh.make_outputs(block_vars, current_time)
     while not intg.stop(cycle, current_time):
-        cycle += 1
-        mesh.set_cycle(cycle)
         dt = mesh.max_time_step(block_vars)
         mesh.print_cycle_info(block_vars, current_time, dt)
         for stage in range(len(intg.stages)):
@@ -168,6 +166,8 @@ def main():
             continue
         if err < 0:
             break
+        cycle += 1
+        mesh.set_cycle(cycle)
         current_time += dt
         mesh.make_outputs(block_vars, current_time)
     mesh.finalize(block_vars, current_time)

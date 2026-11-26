@@ -239,9 +239,6 @@ def run_with(infile: str, restart_file: str = "") -> None:
     intg = blocks[0].module("intg")
     cycle = blocks[0].cycle()
     while not intg.stop(cycle, current_time):
-        cycle += 1
-        mesh.set_cycle(cycle)
-
         dt = mesh.max_time_step(mesh_vars)
         mesh.print_cycle_info(mesh_vars, current_time, dt)
 
@@ -250,11 +247,12 @@ def run_with(infile: str, restart_file: str = "") -> None:
 
         err = mesh.check_redo(mesh_vars)
         if err > 0:
-            cycle = blocks[0].cycle()
             continue
         if err < 0:
             break
 
+        cycle += 1
+        mesh.set_cycle(cycle)
         current_time += dt
         mesh.make_outputs(mesh_vars, current_time)
 

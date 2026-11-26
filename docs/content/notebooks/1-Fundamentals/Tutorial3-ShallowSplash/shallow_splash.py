@@ -68,9 +68,6 @@ def main() -> None:
     intg = mesh.module("block0.intg")
     cycle = 0
     while not intg.stop(cycle, current_time):
-        cycle += 1
-        mesh.set_cycle(cycle)
-
         dt = mesh.max_time_step(block_vars)
         mesh.print_cycle_info(block_vars, current_time, dt)
 
@@ -83,6 +80,8 @@ def main() -> None:
         if err < 0:
             break
 
+        cycle += 1
+        mesh.set_cycle(cycle)
         current_time += dt
         mesh.make_outputs(block_vars, current_time)
 

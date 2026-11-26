@@ -11,7 +11,7 @@ block = MeshBlock(op)
 block.to(device)
 
 # get handles to modules
-coord = block.hydro.module("coord")
+coord = block.module("coord")
 
 # set initial condition
 x3v, x2v, x1v = torch.meshgrid(
@@ -43,11 +43,12 @@ block_vars, current_time = block.initialize(block_vars)
 current_time = 0.0
 block.make_outputs(block_vars, current_time)
 
-while not block.intg.stop(block.inc_cycle(), current_time):
+intg = block.module("intg")
+while not intg.stop(block.cycle(), current_time):
     dt = block.max_time_step(block_vars)
     block.print_cycle_info(block_vars, current_time, dt)
 
-    for stage in range(len(block.intg.stages)):
+    for stage in range(len(intg.stages)):
         block.forward(block_vars, dt, stage)
 
     err = block.check_redo(block_vars)
@@ -56,6 +57,7 @@ while not block.intg.stop(block.inc_cycle(), current_time):
     if err < 0:
         break  # terminate
 
+    block.inc_cycle()
     current_time += dt
     block.make_outputs(block_vars, current_time)
 

@@ -36,35 +36,19 @@ LibTorch without acquiring the Python GIL.
 
 ## Running
 
-Each driver lets `snapy.Mesh` initialize communication using `BACKEND`, `DEVICE`,
-and `DEVICE_ID` from the environment. The `distribute` block defaults to
-`blocks_per_process: 1`, i.e. using one core for each of the six cube faces. Launch with `torchrun`:
+The supplied W92 deck assigns one cubed-sphere face to each of six processes.
+The HS94 and hot-Jupiter decks assign all six faces to a single process.
+Run from this directory with the launch command for the selected deck.
 
 ```bash
-# W92 shallow water (one process holding all 6 faces)
-torchrun --nproc_per_node=6 w92_swe.py --output-dir out_w92
-
-# HS94 dry dynamical core
-torchrun --nproc_per_node=6 hs94_run.py --output-dir out_hs94
-
-# Hot Jupiter
-torchrun --nproc_per_node=6 hjupiter_run.py --output-dir out_hjupiter
+BACKEND=gloo DEVICE=cpu torchrun --standalone --nproc-per-node=6 w92_swe.py --output-dir out_w92
+DEVICE=cpu python hs94_run.py --output-dir out_hs94
+DEVICE=cpu python hjupiter_run.py --output-dir out_hjupiter
 ```
 
-Pass `-c <config.yaml>` to override the default config (each driver defaults to
-the YAML next to it). Adjust `distribute.blocks_per_process` and set `BACKEND`,
-`DEVICE`, `DEVICE_ID`, or `CUDA_VISIBLE_DEVICES` as needed for multi-GPU.
-
-The process count and `blocks_per_process` must describe the six cube faces:
-use six processes with `blocks_per_process: 1` (the supplied configs), or one processes
-with `blocks_per_process: 6` (the single GPU config). In the latter case, you can simply
-launch with `python -u ...`. `-u` means streaming the result instead of caching
-
-Use `DEVICE=cuda` as the environment variable to run on GPU, e.g.:
-
-```bash
-DEVICE=cuda python -u hs94_run.py --output-dir out_hs94
-```
+Use `-c <config.yaml>` for a different deck. With one block per face, the
+process count times `distribute.blocks_per_process` must equal six. Set
+`DEVICE=cuda` to run the single-process examples on a GPU.
 
 ## Expected results
 
@@ -86,9 +70,8 @@ DEVICE=cuda python -u hs94_run.py --output-dir out_hs94
 
 ## Dependencies
 
-`snapy`, `paddle` (distributed/profile helpers and `paddle.cubed_sphere.cubed_sphere_remap`
-for the W92 contravariant↔geographic velocity rotation), `torch`, `numpy`,
-`pyyaml`.
+`snapy`, `paddle` (atmospheric profile setup), and `torch`. W92 uses the
+cubed-sphere coordinate and velocity transforms in `snapy.coord`.
 
 Use Paddle's Snapy 3 dependency for W92. The benchmark relies on spherical
 cross-panel velocity exchange and spherical Coriolis forcing.
