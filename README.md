@@ -2,28 +2,22 @@
 
 Python Atmospheric Dynamics: Discovering and Learning about Exoplanets. An open-source, user-friendly Python version of [canoe](https://github.com/chengcli/canoe).
 
-## Test the package
+## Install and run with Snapy 3
 
-Testing the package can be done very easily by following the steps below. All we need is to create a python virtual environment, install the package, and run the test script.
+From a Paddle checkout, install the package in a Python 3.10–3.13 environment. Paddle uses the PyTorch 2.10.0 ABI used to build Snapy 3.
 
-1. Create a python virtual environment
+```bash
+python -m pip install -e '.[dev]'
+python -m pytest -q
+```
 
-   ```bash
-   python -m venv pyenv
-   ```
+Choose the launcher to match the process layout in the input deck. For example, the shallow-water splash can run all six cubed-sphere faces in one Python process, or distribute three faces to each of two processes on the same host.
 
-2. Install paddle package
-
-   ```bash
-   pip install paddle
-   ```
-
-3. Run test
-
-   ```bash
-   cd tests
-   python test_saturn_adiabat.py
-   ```
+```bash
+cd example_py_scripts
+DEVICE=cpu python shallow_splash.py --input shallow_splash_mesh6.yaml
+BACKEND=gloo DEVICE=cpu torchrun --standalone --nproc-per-node=2 shallow_splash.py --input shallow_splash_proc2_mesh3.yaml
+```
 
 ## Develop with Docker
 

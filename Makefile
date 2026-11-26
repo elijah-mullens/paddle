@@ -6,7 +6,7 @@ GITCREDENTIALS := $${HOME}/.git-credentials
 DATE_STRING := $(shell date "+%Y-%m-%d")
 JOB := canoe$(date +%Y%m%d_%H%M%S)
 HOST := $${HOSTNAME}
-CUDA_VER := 11.8
+CUDA_VER := 12.8
 UBUNTU_VER := 22.04
 
 .PHONY: help env up down ps start build deploy finish log status mint upload node resource

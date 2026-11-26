@@ -34,7 +34,7 @@ def run_with(infile: str) -> None:
     block_vars, current_time = block.initialize({"hydro_w": hydro_w, "solid": solid})
     block.make_outputs(block_vars, current_time)
 
-    while not intg.stop(block.inc_cycle(), current_time):
+    while not intg.stop(block.cycle(), current_time):
         dt = block.max_time_step(block_vars)
         block.print_cycle_info(block_vars, current_time, dt)
 
@@ -47,6 +47,7 @@ def run_with(infile: str) -> None:
         if err < 0:
             break
 
+        block.inc_cycle()
         current_time += dt
         block.make_outputs(block_vars, current_time)
 

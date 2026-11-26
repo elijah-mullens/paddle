@@ -2,12 +2,9 @@ import argparse
 
 import torch
 import yaml
-from kintera import Kinetics, KineticsOptions, ThermoX
+from kintera import KineticsOptions
 from snapy import Mesh, MeshOptions, kICY, kIV1
-from paddle import (
-    evolve_kinetics,
-    setup_profile,
-)
+from paddle import setup_profile
 
 
 def call_user_output(bvars: dict[str, torch.Tensor]):
@@ -42,23 +39,13 @@ def run_with(infile: str, restart_file: str):
 
     mesh.to(device)
 
-    thermo_modules = []
-    for block in blocks:
-        thermo_y = block.module("hydro.eos.thermo")
-        thermo_x = ThermoX(thermo_y.options)
-        thermo_x.to(device)
-        thermo_modules.append(
-            {
-                "eos": block.module("hydro.eos"),
-                "thermo_y": thermo_y,
-                "thermo_x": thermo_x,
-            }
-        )
+    if config.get("reactions"):
+        mesh.set_chemistry(KineticsOptions.from_yaml(infile))
 
     if restart_file != "":
         block_vars, current_time = mesh.initialize_from_restart(restart_file)
     else:
-        species = thermo_modules[0]["thermo_y"].options.species()
+        species = blocks[0].module("hydro.eos.thermo").options.species()
         param = make_params(config, species)
         block_vars = []
         for block in blocks:
@@ -70,36 +57,17 @@ def run_with(infile: str, restart_file: str):
     for block in blocks:
         block.set_user_output_func(call_user_output)
 
-    # kinetics model
-    op_kinet = KineticsOptions.from_yaml(infile)
-    kinet = Kinetics(op_kinet)
-    kinet.to(device)
-
     intg = mesh.module("block0.intg")
-    cycle = 0
+    cycle = blocks[0].cycle()
     if restart_file == "":
         mesh.make_outputs(block_vars, current_time)
 
     while not intg.stop(cycle, current_time):
-        cycle += 1
-        mesh.set_cycle(cycle)
-
         dt = mesh.max_time_step(block_vars)
         mesh.print_cycle_info(block_vars, current_time, dt)
 
         for stage in range(len(intg.stages)):
             mesh.forward(block_vars, dt, stage)
-
-        for bvars, modules in zip(block_vars, thermo_modules):
-            del_rho = evolve_kinetics(
-                bvars["hydro_w"],
-                modules["eos"],
-                modules["thermo_x"],
-                modules["thermo_y"],
-                kinet,
-                dt,
-            )
-            bvars["hydro_u"][kICY:] += del_rho
 
         err = mesh.check_redo(block_vars)
         if err > 0:
@@ -107,6 +75,8 @@ def run_with(infile: str, restart_file: str):
         if err < 0:
             break  # terminate
 
+        cycle += 1
+        mesh.set_cycle(cycle)
         current_time += dt
         mesh.make_outputs(block_vars, current_time)
 

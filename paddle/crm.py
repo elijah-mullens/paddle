@@ -1,76 +1,82 @@
+import argparse
+
 import torch
-import math
-import time
-import kintera
-import numpy as np
-from snapy import (
-    MeshBlockOptions,
-    MeshBlock,
-    OutputOptions,
-    NetcdfOutput,
-)
-from kintera import (
-    ThermoOptions,
-    ThermoX,
-    KineticsOptions,
-    Kinetics,
-)
-from snapy import kIDN, kICY
+import yaml
+from kintera import KineticsOptions
+from snapy import MeshBlock, MeshBlockOptions, kICY, kIV1
+from paddle import setup_profile
+
+
+def make_params(config: dict, species: list[str]) -> dict[str, float]:
+    param = {
+        "Ts": float(config["problem"]["Ts"]),
+        "Ps": float(config["problem"]["Ps"]),
+        "grav": -float(config["forcing"]["const-gravity"]["grav1"]),
+        "Tmin": float(config["problem"]["Tmin"]),
+    }
+    for name in species:
+        param[f"x{name}"] = float(config["problem"].get(f"x{name}", 0.0))
+    return param
+
+
+def run_with(infile: str) -> None:
+    with open(infile, "r", encoding="utf-8") as stream:
+        config = yaml.safe_load(stream)
+
+    options = MeshBlockOptions.from_yaml(infile, verbose=False)
+    block = MeshBlock(options)
+    device = torch.device(options.device_str())
+    block.to(device)
+
+    if config.get("reactions"):
+        block.set_chemistry(KineticsOptions.from_yaml(infile))
+
+    thermo_y = block.module("hydro.eos.thermo")
+    intg = block.module("intg")
+    param = make_params(config, thermo_y.options.species())
+
+    def call_user_output(bvars: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        hydro_w = bvars["hydro_w"]
+        return {"qtol": hydro_w[kICY:].sum(dim=0)}
+
+    block.set_user_output_func(call_user_output)
+
+    hydro_w = setup_profile(block, param, method="pseudo-adiabat")
+    hydro_w[kIV1] += 0.01 * torch.rand_like(hydro_w[kIV1])
+
+    block_vars, current_time = block.initialize({"hydro_w": hydro_w})
+    block.make_outputs(block_vars, current_time)
+
+    if config.get("dynamics", {}).get("disable", False):
+        block.finalize(block_vars, current_time)
+        return
+
+    while not intg.stop(block.cycle(), current_time):
+        dt = block.max_time_step(block_vars)
+        block.print_cycle_info(block_vars, current_time, dt)
+
+        for stage in range(len(intg.stages)):
+            block.forward(block_vars, dt, stage)
+
+        err = block.check_redo(block_vars)
+        if err > 0:
+            continue
+        if err < 0:
+            break
+
+        block.inc_cycle()
+        current_time += dt
+        block.make_outputs(block_vars, current_time)
+
+    block.finalize(block_vars, current_time)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", default="earth_moist.yaml")
+    args = parser.parse_args()
+    run_with(args.input)
+
 
 if __name__ == "__main__":
-    # input file
-    infile = "earth.yaml"
-    device = "cpu"
-
-    # create meshblock
-    op_block = MeshBlockOptions.from_yaml(infile)
-    block = MeshBlock(op_block)
-    block.to(torch.device(device))
-
-    # create thermo module
-    op_thermo = ThermoOptions.from_yaml(infile)
-    thermo_x = ThermoX(op_thermo)
-    thermo_x.to(torch.device(device))
-
-    # create kinetics module
-    op_kinet = KineticsOptions.from_yaml(infile)
-    kinet = Kinetics(op_kinet)
-    kinet.to(torch.device(device))
-
-    # create output fields
-    op_out = OutputOptions().file_basename("earth")
-    out2 = NetcdfOutput(op_out.fid(2).variable("prim"))
-    out3 = NetcdfOutput(op_out.fid(3).variable("uov"))
-    out4 = NetcdfOutput(op_out.fid(4).variable("diag"))
-    outs = [out2, out4]
-
-    # set up initial condition
-    w = setup_initial_condition(block, thermo_x)
-    print("w = ", w[:, 0, 0, :])
-
-    # integration
-    current_time = 0.0
-    count = 0
-    start_time = time.time()
-    interior = block.part((0, 0, 0))
-    while not block.intg.stop(count, current_time):
-        dt = block.max_time_step()
-        u = block.buffer("hydro.eos.U")
-
-        if count % 1 == 0:
-            print(f"count = {count}, dt = {dt}, time = {current_time}")
-            print("mass = ", u[interior][kIDN].sum())
-
-            for out in outs:
-                out.increment_file_number()
-                out.write_output_file(block, current_time)
-                out.combine_blocks()
-
-        for stage in range(len(block.intg.stages)):
-            block.forward(dt, stage)
-
-        # evolve kinetics
-        u[kICY:] += evolve_kinetics(block, kinet, thermo_x)
-
-        current_time += dt
-        count += 1
+    main()

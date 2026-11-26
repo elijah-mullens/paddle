@@ -4,7 +4,6 @@ import json
 import os
 from pathlib import Path
 import shutil
-import socket
 import subprocess
 import sys
 
@@ -15,12 +14,6 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_DIR = REPO_ROOT / "example_py_scripts"
-
-
-def _get_free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
 
 
 def _base_env() -> dict[str, str]:
@@ -99,11 +92,8 @@ def _run_single(
     script_name: str | Path, yaml_path: Path | None, extra_args: list[str] | None = None
 ) -> None:
     env = _base_env()
-    env["MASTER_ADDR"] = "127.0.0.1"
-    env["MASTER_PORT"] = str(_get_free_port())
-    env["RANK"] = "0"
-    env["WORLD_SIZE"] = "1"
-    env["LOCAL_RANK"] = "0"
+    for key in ("MASTER_ADDR", "MASTER_PORT", "RANK", "WORLD_SIZE", "LOCAL_RANK"):
+        env.pop(key, None)
 
     cmd = [sys.executable, str(EXAMPLE_DIR / script_name)]
     if yaml_path is not None:
@@ -251,4 +241,47 @@ def test_saturn_adiabat_script(tmp_path: Path) -> None:
         yaml_path,
         extra_args=["--output", str(output)],
     )
-    assert output.exists()
+    rows = [
+        line for line in output.read_text().splitlines() if not line.startswith("#")
+    ]
+    assert len(rows) == 64
+
+
+@pytest.mark.parametrize(
+    ("script", "deck"),
+    [
+        ("exo3-benchmarks/hs94_run.py", "exo3-benchmarks/hs94.yaml"),
+        ("exo3-benchmarks/hjupiter_run.py", "exo3-benchmarks/hjupiter.yaml"),
+        ("exo3-benchmarks/w92_swe.py", "exo3-benchmarks/w92.yaml"),
+    ],
+)
+def test_exo3_accepted_cycles(tmp_path: Path, script: str, deck: str) -> None:
+    yaml_path = _write_yaml(
+        tmp_path,
+        deck,
+        {
+            "geometry.cells.nx1": 1 if "w92" in deck else 16,
+            "geometry.cells.nx2": 16,
+            "geometry.cells.nx3": 16,
+            "distribute.blocks_per_process": 6,
+            "integration.nlim": 2,
+            "integration.ncycle_out": 1,
+        },
+    )
+    result = subprocess.run(
+        [sys.executable, str(EXAMPLE_DIR / script), "-c", str(yaml_path)],
+        cwd=tmp_path,
+        env=_base_env(),
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    # A retry can repeat the current cycle. Only acceptance advances the clock.
+    cycles = [
+        line.split()[0]
+        for line in result.stdout.splitlines()
+        if line.startswith("cycle=")
+    ]
+    assert list(dict.fromkeys(cycles)) == ["cycle=0", "cycle=1"]
+    assert "cycle=2" in result.stdout and "Terminating on cycle limit" in result.stdout

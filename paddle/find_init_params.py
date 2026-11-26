@@ -36,12 +36,16 @@ def find_init_params(
     count = 0
     eos = block.module("hydro.eos")
 
+    coord = block.module("coord")
+    active = slice(coord.il(), coord.iu() + 1)
     while count < max_iter:
         if verbose:
             print(f"Iteration {count+1}: Trying Ts={param['Ts']}\n")
 
         # setup profile
         w = setup_profile(block, param, method=method)
+
+        w = w[..., active]
 
         # calculate temperature
         temp = eos.compute("W->T", (w,)).squeeze()
